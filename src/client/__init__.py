@@ -1,8 +1,9 @@
+from typing import Union
 import logging
-from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple, Mapping
 import httpx
 
+from src.response import Response
 from src.utils.url import URL
 from src.client.options import RequestOptions
 from src.strategies import ErrorStrategy, NoRetries, RetryStrategy
@@ -68,13 +69,16 @@ class APIClient:
         self._base_url = URL(value)
         self.client.base_url = self._base_url
 
-    async def request(self, *args, **kwargs) -> httpx.Response:
+    async def request(self, *args, **kwargs) -> Response:
         if isinstance(args[0], RequestOptions):
-            return await self.request_from_request_options(args[0])
+            function = self.request_from_request_options
         elif isinstance(args[0], httpx.Request):
-            return await self.request_from_httpx_request(args[0])
+            function = self.request_from_httpx_request
         else:
             raise ValueError("Unsupported request type. Use RequestOptions or httpx.Request.")
+
+        response = await function(*args, **kwargs)
+        return Response(response)
 
     async def request_from_httpx_request(self, request: httpx.Request) -> httpx.Response:
         """

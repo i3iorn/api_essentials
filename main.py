@@ -8,7 +8,7 @@ from src.endpoint import EndpointDefinition, Endpoint
 from src.parameter import ParameterFactoryService, applier_registry
 
 
-class Decisioning(AbstractAPI):
+class RGSDecisioning(AbstractAPI):
     def __init__(self):
         base_url="https://sandbox-api.bisnode.com/decision/v3/"
         credentials = ClientCredentials(
@@ -43,11 +43,16 @@ class Decisioning(AbstractAPI):
                     description="Registration number of the company",
                     required=True,
                     value_type="string",
-                    constraint=param_factory.string_constraint(
-                        min_length=1,
-                        max_length=20
-                    )
+                    min_length=6,
+                    max_length=13,
                 ),
+                param_factory.query(
+                    name="reference",
+                    description="Request reference, returned in the response.",
+                    required=True,
+                    value_type="string",
+                    min_length=1,
+                )
             ]
         )
         b2b_se_decision = Endpoint(
@@ -63,14 +68,17 @@ class Decisioning(AbstractAPI):
 
 
 async def main():
-    decisioning_api = Decisioning()
+    decisioning_api = RGSDecisioning()
     await decisioning_api.initialize_client(verify=False)
-    response = await decisioning_api.send_request(decisioning_api.endpoints()[0], json={
-        "registrationNumber": "9164103864",
-        "rulesetKey": "1-1235-4566-7891",
-        "reference": "1234567890",
-    })
-    print(type(response), response.content, f"{response.request.method} {response.request.url}", response.request.content, response.request.headers, sep="\n")
+    response = await decisioning_api.send_request(
+        decisioning_api.endpoints()[0], json={
+            "registrationNumber": "9164103864",
+            "rulesetKey": "1-1235-4566-7891",
+            "reference": "1234567890",
+        }
+    )
+    # Print the HTTP Request in standard HTTP format
+    response.print_http_formatted_string()
 
 if __name__ == "__main__":
     asyncio.run(main())

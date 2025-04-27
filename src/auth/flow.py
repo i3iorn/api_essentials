@@ -143,7 +143,6 @@ class OAuth2Auth(Auth):
             await self.refresh_token()
 
         request.headers[AUTHORIZATION_HEADER_NAME] = f"Bearer {self.token}"
-        print(f"Authorization header set to: {request.headers[AUTHORIZATION_HEADER_NAME]}")
         response = yield request
 
         if response.status_code == 401:
