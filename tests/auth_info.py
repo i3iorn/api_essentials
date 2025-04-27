@@ -1,6 +1,6 @@
 import unittest
 
-from api_essentials.auth.info import UserCredentials, ClientCredentials, TokenCredentials, ApiCredentials
+from src.auth.info import UserCredentials, ClientCredentials, TokenCredentials, ApiCredentials
 
 
 class TestCredentials(unittest.TestCase):
@@ -8,7 +8,7 @@ class TestCredentials(unittest.TestCase):
     # Positive tests
     def test_client_credentials_get_credentials(self):
         # Positive test for ClientCredentials
-        client_creds = ClientCredentials(client_id="client123", client_secret="secret123", scope="read")
+        client_creds = ClientCredentials(client_id="client123", client_secret="secret123", scopes=["read"])
         result = client_creds.get_credentials()
         self.assertEqual(result, {
             "client_id": "client123",

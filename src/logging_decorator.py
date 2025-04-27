@@ -27,7 +27,7 @@ def log_method_calls(include_dunder: bool = False):
         for name, attr in cls.__dict__.items():
             if callable(attr) and (include_dunder or not name.startswith("__")):
                 wrapped = _wrap_method(attr, cls.logger)
-                cls.logger.debug(f"Wrapping method: {name}")
+                cls.logger.debug(f"Wrapping method: {name}", extra={"payload": None})
                 setattr(cls, name, wrapped)
         return cls
 
@@ -61,12 +61,12 @@ def log_method_calls(include_dunder: bool = False):
                 nonlocal result
                 result = await method(*args, **kwargs)
                 logger.debug(f"[{method.__qualname__}] Args: {arg_types}, "
-                             f"Return: {type(result).__name__}, Time: {duration:.4f}s")
+                             f"Return: {type(result).__name__}, Time: {duration:.4f}s", extra={"payload": None})
                 return result
             return run_async()
 
         logger.debug(f"[{method.__qualname__}] Args: {arg_types}, "
-                     f"Return: {type(result).__name__}, Time: {duration:.4f}s")
+                     f"Return: {type(result).__name__}, Time: {duration:.4f}s", extra={"payload": None})
         return result
 
     return class_decorator

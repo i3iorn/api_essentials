@@ -1,11 +1,12 @@
+import json
 import logging
 from abc import abstractmethod, ABC
-from typing import Optional, Callable
+from typing import Optional, Callable, Any, Type
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, RetryCallState
 
-from api_essentials.logging_decorator import log_method_calls
+from src.logging_decorator import log_method_calls
 
 
 class Strategy(ABC):
@@ -18,6 +19,20 @@ class Strategy(ABC):
         Apply the strategy.
         """
         pass
+
+
+class StandardScopeStrategy(Strategy):
+    """
+    Standard scope strategy for OAuth2 authentication.
+    """
+    def apply(self, scopes: list) -> str:
+        """
+        Apply the standard scope strategy.
+        """
+        if not isinstance(scopes, list):
+            raise ValueError("Scopes must be a list.")
+        return " ".join(scopes)
+
 
 
 @log_method_calls()
@@ -80,3 +95,37 @@ class NoRetries(RetryStrategy):
     """
     def __init__(self):
         super().__init__(retries=0, wait_multiplier=0, wait_max=0)
+
+
+class CoercionStrategy(Strategy, ABC):
+    @abstractmethod
+    def apply(self, raw: Any) -> Any:
+        ...
+
+
+class SimpleCoercion(CoercionStrategy):
+    def __init__(self, target: Type):
+        self.target = target
+
+    def apply(self, raw: Any) -> Any:
+        if isinstance(raw, self.target):
+            return raw
+        try:
+            return self.target(raw)
+        except Exception as e:
+            raise TypeError(f"Cannot coerce {raw!r} to {self.target.__name__}") from e
+
+
+class JSONCoercion(CoercionStrategy):
+    def apply(self, raw: Any) -> Any:
+        if isinstance(raw, str):
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError as e:
+                if raw.startswith("{") or raw.startswith("[") or raw.endswith("}") or raw.endswith("]"):
+                    raise ValueError(f"Invalid JSON: {raw!r}") from e
+                else:
+                    return raw
+        elif isinstance(raw, (dict, list)):
+            return raw
+        raise TypeError(f"Cannot coerce {raw!r} to JSON")

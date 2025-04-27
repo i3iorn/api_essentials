@@ -2,21 +2,17 @@ import base64
 import logging
 from datetime import datetime, timedelta
 
-from typing import Generator, Mapping, Dict, Callable, Optional, List, Tuple
-import requests
-from httpx import Auth, Request
+from typing import Generator, Mapping, Dict, Callable, Optional, List, Tuple, AsyncGenerator
 
-from api_essentials.auth.info import ClientCredentials
-from api_essentials.logging_decorator import log_method_calls
-from api_essentials.utils import validate_url
+import httpx
+from httpx import Auth, Request, Response
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler()
-    ]
-)
+from src.utils.url import URL
+from src.auth.info import ClientCredentials
+from src.logging_decorator import log_method_calls
+from src.strategies import Strategy
+from src.utils import rebuild_request
+
 GRACE_PERIOD = 60  # seconds
 DEFAULT_TOKEN_NAME = "access_token"
 DEFAULT_EXPIRATION_NAME = "expires_in"
@@ -44,9 +40,10 @@ class OAuth2Auth(Auth):
             auth_info: ClientCredentials,
             token_url: str,
             grant_type: str = None,
-            headers: List[Mapping[str, str]] = None,
+            headers: Mapping[str, str] = None,
             token_extractor: Optional[Callable[[Dict], Optional[str]]] = None,
             token_expiration_extractor: Optional[Callable[[Dict], int]] = None,
+            scope_strategy: Optional[Strategy] = None
     ) -> None:
         self._validate_input(
             auth_info=auth_info,
@@ -54,7 +51,8 @@ class OAuth2Auth(Auth):
             grant_type=grant_type,
             headers=headers,
             token_extractor=token_extractor,
-            token_expiration_extractor=token_expiration_extractor
+            token_expiration_extractor=token_expiration_extractor,
+            scope_strategy=scope_strategy
         )
 
         self.auth_info                      = auth_info
@@ -65,7 +63,7 @@ class OAuth2Auth(Auth):
         self.token_expiration_extractor     = token_expiration_extractor or self._default_token_expiration_extractor
         self.token: str | None              = None
         self.token_data: Dict | None        = None
-        self.expires_at: datetime | None    = None
+        self.expires_at: datetime | None    = datetime.now()
 
     def _validate_input(
             self,
@@ -74,7 +72,8 @@ class OAuth2Auth(Auth):
             grant_type: str,
             headers: List[Mapping[str, str]],
             token_extractor: Optional[Callable[[Dict], Optional[str]]],
-            token_expiration_extractor: Optional[Callable[[Dict], int]]
+            token_expiration_extractor: Optional[Callable[[Dict], int]],
+            scope_strategy: Optional[Strategy]
     ) -> None:
         """
         Validates the input parameters for the OAuth2Auth class.
@@ -109,7 +108,9 @@ class OAuth2Auth(Auth):
             raise ValueError("Each header dictionary must contain 'name' and 'value' keys.")
         if headers and not all(header["name"] and header["value"] for header in headers):
             raise ValueError("Header names and values must be non-empty strings.")
-        validate_url(token_url)
+        if scope_strategy is not None and not isinstance(scope_strategy, Strategy):
+            raise TypeError("scope_strategy must be an instance of Strategy.")
+        URL(token_url)
 
     def _default_token_extractor(self, response: Dict[str, str]) -> Optional[str]:
         """
@@ -135,21 +136,21 @@ class OAuth2Auth(Auth):
         """
         return datetime.now() + timedelta(seconds=response.get(DEFAULT_EXPIRATION_NAME, 0))
 
-    def auth(self, request: Request) -> Generator[Request, None, None]:
-        """
-        Adds the Authorization header to the request.
-
-        Args:
-            request (Request): The HTTP request to authenticate.
-
-        Yields:
-            Request: The authenticated request.
-        """
+    async def async_auth_flow(
+        self, request: Request
+    ) -> AsyncGenerator[Request, Response]:
         if self.has_expired():
-            self.refresh_token()
-        if self.token:
-            request.headers[AUTHORIZATION_HEADER_NAME] = f"Bearer {self.token}"
-        yield request
+            await self.refresh_token()
+
+        request.headers[AUTHORIZATION_HEADER_NAME] = f"Bearer {self.token}"
+        print(f"Authorization header set to: {request.headers[AUTHORIZATION_HEADER_NAME]}")
+        response = yield request
+
+        if response.status_code == 401:
+            await self.refresh_token()
+            retry = await rebuild_request(response.request)
+            retry.headers[AUTHORIZATION_HEADER_NAME] = f"Bearer {self.token}"
+            yield retry
 
     def has_expired(self) -> bool:
         """
@@ -160,39 +161,47 @@ class OAuth2Auth(Auth):
         """
         return self.expires_at < datetime.now() or self.token is None
 
-    def refresh_token(self, **kwargs) -> None:
-        """
-        Refreshes the OAuth2 token using the refresh token.
-
-        This method should be called when the access token expires.
-        """
+    async def refresh_token(self, **kwargs) -> None:
         self._verify_request_kwargs(kwargs)
 
-        auth_string = f"{self.auth_info.client_id}:{self.auth_info.client_secret}"
-        base_64_token = base64.b64encode(auth_string.encode())
+        auth_str = f"{self.auth_info.client_id}:{self.auth_info.client_secret}"
+        basic_token = base64.b64encode(auth_str.encode()).decode()
 
-        data = {
-            "grant_type": self.grant_type,
-            "scope": self.auth_info.scope
-        }
+        data = {"grant_type": self.grant_type, "scope": self.auth_info.get_scope()}
         data.update(kwargs.pop("data", {}))
-        headers = {
-            "Authorization": f"Basic {base_64_token.decode()}",
-        }
-        headers.update(self.headers)
+
+        # Start with Basic auth header
+        headers = {AUTHORIZATION_HEADER_NAME: f"Basic {basic_token}"}
+        # Merge in any extra headers (our list of dicts)
+        for hdr in self.headers:
+            headers[hdr["name"]] = hdr["value"]
+        # Finally allow overrides via kwargs
         headers.update(kwargs.pop("headers", {}))
 
-        token_response = requests.post(self.token_url, data=data, headers=headers, **kwargs)
+        async with httpx.AsyncClient(
+                timeout=kwargs.get("timeout", 10.0),
+                verify=kwargs.get("verify", True)
+        ) as client:
+            token_response = await client.post(self.token_url, data=data, headers=headers)
 
         if token_response.status_code != 200:
-            logging.error(f"Token request failed with {token_response.status_code}: {token_response.content}")
+            logging.error(
+                f"Token request failed: {token_response.status_code} {token_response.text}"
+            )
             raise ValueError(f"Failed to obtain token: {token_response.text}")
 
         token_data = token_response.json()
+        # store raw payload
         self.token_data = token_data
+        # extract token & expiration
         self.token = self.token_extractor(token_data)
-        self.expires_at = self.token_expiration_extractor(token_data) - timedelta(seconds=GRACE_PERIOD)
-        logging.debug("refresh_token() called")
+        expires = self.token_expiration_extractor(token_data)
+        # if expiration is a delta, unify here:
+        if isinstance(expires, (int, float)):
+            expires = datetime.now() + timedelta(seconds=expires)
+        self.expires_at = expires - timedelta(seconds=GRACE_PERIOD)
+
+        logging.debug("refresh_token() completed", extra={"payload": None})
 
     def _verify_request_kwargs(self, kwargs):
         """

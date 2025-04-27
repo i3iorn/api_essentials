@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Optional
+
+from src.strategies import Strategy, StandardScopeStrategy
 
 
 class AbstractCredentials(ABC):
@@ -23,6 +25,7 @@ class ClientCredentials(AbstractCredentials):
     client_id: str
     client_secret: str
     scopes: List[str]
+    scope_strategy: Optional[Strategy] = StandardScopeStrategy()
 
     def __post_init__(self):
         if not self.client_id or not self.client_secret:
@@ -32,12 +35,23 @@ class ClientCredentials(AbstractCredentials):
         if not isinstance(self.scopes, List):
             raise TypeError("Scope must be a string.")
 
+        if self.scope_strategy and not isinstance(self.scope_strategy, Strategy):
+            raise TypeError("Scope strategy must be an instance of Strategy.")
+
     def get_credentials(self) -> dict:
         return {
             "client_id": self.client_id,
             "client_secret": self.client_secret,
-            "scopes": self.scopes
+            "scope": self.scope_strategy.apply(self.scopes)
         }
+
+    def get_scope(self):
+        """
+        Get the scope as a string.
+        """
+        if not self.scopes:
+            raise ValueError("Scopes are not set.")
+        return self.scope_strategy.apply(self.scopes)
 
 
 @dataclass
