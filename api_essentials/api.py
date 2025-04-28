@@ -39,6 +39,7 @@ class AbstractAPI(ABC):
     def __init__(self, client: APIClient):
         self.client = client
 
+    @property
     @abstractmethod
     def endpoints(self) -> List[Endpoint]:
         """Return a list of API endpoints."""
@@ -50,14 +51,23 @@ class AbstractAPI(ABC):
     async def request(self, auth_info: AbstractCredentials, endpoint: Endpoint, **kwargs) -> Response:
         """
         Make a request to the API.
-        :param method: HTTP method (GET, POST, etc.)
-        :param path: API endpoint
+
         :param kwargs: Additional request parameters
         :return: Response object
         """
         return await self.client.request(
             endpoint.build_request(auth_info=auth_info, **kwargs)
         )
+
+
+class BaseApi(AbstractAPI):
+    @property
+    def endpoints(self) -> List[Endpoint]:
+        return self._endpoints
+
+    def set_endpoints(self, value: List[Endpoint]) -> None:
+        self._endpoints = value
+
 
 
 class APIRegistry:

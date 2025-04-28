@@ -3,6 +3,7 @@ import logging
 from typing import Callable, Dict, List, Optional, Tuple, Mapping
 import httpx
 from httpx import URL
+from openapi_core import OpenAPI
 
 from api_essentials.response import Response
 from api_essentials.client.options import RequestOptions
@@ -29,11 +30,13 @@ class APIClient:
         retry_strategy: Optional[RetryStrategy]             = None,
         flags:          Optional[Tuple[Flag]]               = None,
         user_agent:     Optional[str]                       = None,
+        verify:         bool                                = True,
         **kwargs
     ):
         self.logger          = logging.getLogger(__name__)
-        self._flags          = set(flags)
+        self._flags          = set(flags or ())
         self._auth           = auth
+        self._verify         = verify
         self._base_url       = URL(base_url)
         self._timeout        = timeout
         self._error_strategy = error_strategy or ErrorStrategy()
@@ -44,7 +47,7 @@ class APIClient:
         response_hooks = response_hooks or []
         request_hooks = request_hooks or []
 
-        if USE_DEFAULT_POST_RESPONSE_HOOK in self._flags:
+        if self._flags and USE_DEFAULT_POST_RESPONSE_HOOK in self._flags:
             response_hooks.append(self._error_strategy.apply)
 
         event_hooks: Mapping[str, List[Callable]] = {
@@ -56,7 +59,7 @@ class APIClient:
             auth=self._auth,
             base_url=self._base_url,
             timeout=self._timeout,
-            verify=not (ALLOW_UNSECURE in self._flags),
+            verify=self._verify,
             headers=headers,
             event_hooks=event_hooks,
             **kwargs
@@ -70,7 +73,7 @@ class APIClient:
     def user_agent(self) -> str:
         return self._user_agent
 
-    async def request(self, request: httpx.Request) -> Response:
+    async def request(self, request: httpx.Request, **kwargs) -> Response:
         """
         Make a request using the HTTPX client.
         """
@@ -96,3 +99,32 @@ class APIClient:
     async def close(self) -> None:
         """Close the internal connection pool."""
         await self.client.aclose()
+
+    @classmethod
+    def from_openapi(
+        cls,
+        openapi_spec: OpenAPI,
+        auth:         httpx.Auth,
+        verify:     bool = True,
+        **kwargs
+    ) -> "APIClient":
+        """
+        Create an API client from an OpenAPI specification.
+        Attempts to use the first server URL in the OpenAPI spec.
+        """
+
+        # Default to first server's URL if available
+        try:
+            server = openapi_spec.spec.get("servers", [])[0]
+            base_url = server["url"]
+        except (IndexError, KeyError, AttributeError) as e:
+            raise ValueError("No valid server URL found in OpenAPI spec") from e
+
+        # Pass all remaining arguments to the constructor
+        return cls(
+            base_url=URL(base_url),
+            auth=auth,
+            verify=verify,
+            **kwargs
+        )
+

@@ -1,7 +1,8 @@
 from ._applier import ApplierRegistry, ParameterApplier, BodyApplier, QueryApplier, PathApplier, HeaderApplier
 from ._factory import ParameterFactoryService
 from ._spec import OpenApiVisitor
-from ._constraint import ParameterValueType
+from._enums import ParameterValueType
+from ._constraint import ParameterConstraint
 from ._definition import ParameterDefinition, ParameterLocation
 
 
@@ -25,5 +26,6 @@ __all__ = [
     "BodyApplier",
     "QueryApplier",
     "PathApplier",
-    "HeaderApplier"
+    "HeaderApplier",
+    "ParameterConstraint"
 ]

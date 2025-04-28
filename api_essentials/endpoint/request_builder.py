@@ -1,9 +1,11 @@
+import json
 import logging
 from typing import Dict, Any, TYPE_CHECKING
 
 import httpx
 
 from api_essentials.auth import AbstractCredentials
+from api_essentials.auth.flow import AUTHORIZATION_HEADER_NAME
 from api_essentials.endpoint.definition import EndpointDefinition
 from api_essentials.logging_decorator import log_method_calls
 from api_essentials.parameter import applier_registry
@@ -43,9 +45,12 @@ class RequestBuilder:
         # Validate each provided value
         for name, raw in data.items():
             pd = next((p for p in self.endpoint.parameters if p.name == name), None)
-            if not pd:
-                raise ValueError(f"Unexpected parameter '{name}'")
-            pd.constraint.validate(pd.name, raw)
+            if pd:
+                pd.constraint.validate(pd.name, raw)
+            elif pd:
+                logger.warning(
+                    f"{pd.name} is not configured for this endpoint."
+                )
 
     def build(self, auth_info: AbstractCredentials, **data: Any) -> httpx.Request:
         self.validate_input(data)
@@ -54,23 +59,34 @@ class RequestBuilder:
         url = self.api.client.base_url.copy_with(path=new_path)
         req = httpx.Request(self.endpoint.method, url)
 
+
         # Apply each parameter
-        for pd in self.endpoint.parameters:
-            if pd.name == "Authorization":
-                # Skip Authorization header, handled separately by the API client
-                continue
+        if self.endpoint.parameters:
+            for pd in self.endpoint.parameters:
+                if pd.name == AUTHORIZATION_HEADER_NAME:
+                    # Skip Authorization header, handled separately by the API client
+                    continue
 
-            if pd.name in data:
-                val = data[pd.name]
-                logger.debug(f"Starting with parameter '{pd.name}' with value '{val}'")
+                if pd.name in data:
+                    val = data[pd.name]
+                    logger.debug(f"Starting with parameter '{pd.name}' with value '{val}'")
 
-                if pd.constraint.validate(pd.name, val):
-                    val = pd.constraint.coerce(pd.name, val)
+                    if pd.constraint.validate(pd.name, val):
+                        val = pd.constraint.coerce(pd.name, val)
 
-                applier = applier_registry.get(pd.location)
-                req = applier.apply(req, pd, val)
+                    applier = applier_registry.get(pd.location)
+                    req = applier.apply(req, pd, val)
+                    print(req.content)
 
-                logger.debug(f"Finished with parameter '{pd.name}' with value '{val}'")
+                    logger.debug(f"Finished with parameter '{pd.name}' with value '{val}'")
+        else:
+            req = httpx.Request(
+                method=req.method,
+                json=data,
+                url=req.url,
+                extensions=req.extensions,
+                headers=req.headers
+            )
 
         # Apply headers
         for name, value in self.default_headers.items():

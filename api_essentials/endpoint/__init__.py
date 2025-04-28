@@ -18,6 +18,9 @@ class Endpoint:
             **parameters
         )
 
+    def __repr__(self):
+        return f"Endpoint({self.definition.path})"
+
 
 
 __all__ = [

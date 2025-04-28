@@ -178,7 +178,15 @@ class OAuth2Auth(Auth):
                 timeout=kwargs.get("timeout", 10.0),
                 verify=kwargs.get("verify", True)
         ) as client:
+            print(
+                f"Token URL: {self.token_url}",
+                f"Data: {data}",
+                f"Headers: {headers}",
+                f"Request kwargs: {kwargs}",
+                sep="\n"
+            )
             token_response = await client.post(self.token_url, data=data, headers=headers)
+            print(token_response.text)
 
         if token_response.status_code != 200:
             logging.error(

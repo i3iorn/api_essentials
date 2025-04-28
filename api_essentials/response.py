@@ -3,6 +3,8 @@ from typing import Union, Any
 
 import httpx
 
+from api_essentials.auth.flow import AUTHORIZATION_HEADER_NAME
+
 
 class HTTPFormatter:
     @classmethod
@@ -26,7 +28,7 @@ class HTTPFormatter:
         """
         Join all headers into the canonical "Name: value" form, one per line.
         """
-        return "\r\n".join(f"{name}: {value}" if name != "authorization" else f"{name}: [secure]" for name, value in headers.items())
+        return "\r\n".join(f"{name}: {value}" if name != AUTHORIZATION_HEADER_NAME else f"{name}: [secure]" for name, value in headers.items())
 
     @classmethod
     def _format_body(cls, body: Union[bytes, str, None]) -> str:
