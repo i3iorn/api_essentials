@@ -1,9 +1,11 @@
 import warnings
 from dataclasses import dataclass
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, TYPE_CHECKING
 
-from ._constraint import ParameterConstraint
-from ._enums import ParameterLocation, ParameterValueType
+from ._enums import ParameterLocation
+
+if TYPE_CHECKING:
+    from ._constraint import ParameterConstraint
 
 
 @dataclass(frozen=True)
@@ -12,7 +14,7 @@ class ParameterDefinition:
     location:               ParameterLocation
     required:               bool
     description:            Optional[str]
-    constraint:             ParameterConstraint
+    constraint:             "ParameterConstraint"
     deprecated:             bool                = False
     deprecated_description: Optional[str]       = None
 

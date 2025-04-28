@@ -1,8 +1,10 @@
 from dataclasses import dataclass
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 
 from src.logging_decorator import log_method_calls
-from src.parameter import ParameterDefinition
+
+if TYPE_CHECKING:
+    from src.parameter import ParameterDefinition
 
 
 @dataclass(frozen=True)
@@ -25,7 +27,7 @@ class EndpointDefinition:
     path:            str
     method:          str
     description:     Optional[str]
-    parameters:      List[ParameterDefinition]
+    parameters:      List["ParameterDefinition"]
 
     @property
     def operation_id(self):

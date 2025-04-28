@@ -2,14 +2,16 @@ import json
 import logging
 import urllib.parse
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Dict, Any, TYPE_CHECKING
 
 import httpx
 from httpx import URL
 
 from ._enums import ParameterLocation
-from ._definition import ParameterDefinition
 from ..logging_decorator import log_method_calls
+
+if TYPE_CHECKING:
+    from ._definition import ParameterDefinition
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +81,7 @@ class ParameterApplier(ABC):
         
     """
     @abstractmethod
-    def apply(self, req: httpx.Request, pd: ParameterDefinition, val: Any) -> httpx.Request:
+    def apply(self, req: httpx.Request, pd: "ParameterDefinition", val: Any) -> httpx.Request:
         ...
 
 
@@ -117,7 +119,7 @@ class HeaderApplier(ParameterApplier):
 
 @log_method_calls()
 class BodyApplier(ParameterApplier):
-    def apply(self, req: httpx.Request, pd: ParameterDefinition, val: Any):
+    def apply(self, req: httpx.Request, pd: "ParameterDefinition", val: Any):
         current_content = req.content
         # Add the new parameter to the body
         if isinstance(current_content, bytes):

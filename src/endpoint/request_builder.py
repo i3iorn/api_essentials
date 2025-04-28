@@ -6,7 +6,7 @@ import httpx
 from src.auth import AbstractCredentials
 from src.endpoint.definition import EndpointDefinition
 from src.logging_decorator import log_method_calls
-from src.parameter import ApplierRegistry, ParameterLocation
+from src.parameter import applier_registry
 
 
 logger = logging.getLogger(__name__)
@@ -21,19 +21,15 @@ class RequestBuilder:
     def __init__(
         self,
         endpoint: EndpointDefinition,
-        api: "AbstractAPI",
-        appliers: ApplierRegistry
+        api: "AbstractAPI"
     ):
         from src.api import AbstractAPI
         if not isinstance(endpoint, EndpointDefinition):
             raise TypeError("endpoint must be an instance of EndpointDefinition")
         if not isinstance(api, AbstractAPI):
             raise TypeError("api must be an instance of AbstractAPI")
-        if not isinstance(appliers, ApplierRegistry):
-            raise TypeError("appliers must be an instance of ApplierRegistry")
 
         self.endpoint = endpoint
-        self.appliers = appliers
         self.api = api
 
         self.default_headers = {
@@ -44,13 +40,6 @@ class RequestBuilder:
 
     def validate_input(self, data: Dict[str, Any]) -> None:
         # Ensure all required parameters present
-        for pd in self.endpoint.parameters:
-            if pd.location == ParameterLocation.HEADER:
-                continue
-
-            if pd.required and pd.name not in data:
-                raise ValueError(f"Missing required parameter '{pd.name}'")
-
         # Validate each provided value
         for name, raw in data.items():
             pd = next((p for p in self.endpoint.parameters if p.name == name), None)
@@ -78,7 +67,7 @@ class RequestBuilder:
                 if pd.constraint.validate(pd.name, val):
                     val = pd.constraint.coerce(pd.name, val)
 
-                applier = self.appliers.get(pd.location)
+                applier = applier_registry.get(pd.location)
                 req = applier.apply(req, pd, val)
 
                 logger.debug(f"Finished with parameter '{pd.name}' with value '{val}'")
