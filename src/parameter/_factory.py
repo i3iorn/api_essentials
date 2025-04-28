@@ -41,6 +41,4 @@ class ParameterFactoryService:
 
     def body(self, name: str, **kw):
         pd = self._make(name, ParameterLocation.BODY, **kw)
-        if pd.constraint.value_type not in {ParameterValueType.OBJECT, ParameterValueType.JSON}:
-            raise ValueError("Body params must be OBJECT or JSON")
         return pd

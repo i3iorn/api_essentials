@@ -12,7 +12,7 @@ class TestOAuth2Auth(unittest.TestCase):
         # Setup credentials for ClientCredentials
         self.auth_info = ClientCredentials(client_id="client123", client_secret="secret123", scopes=["read"])
         self.token_url = "https://example.com/token"
-        self.auth = OAuth2Auth(auth_info=self.auth_info, token_url=self.token_url)
+        self.auth = OAuth2Auth(token_url=self.token_url)
 
     # Positive tests
 

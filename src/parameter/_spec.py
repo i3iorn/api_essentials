@@ -18,13 +18,11 @@ class OpenApiVisitor(SpecVisitor):
         return pd.to_openapi()
     def visit_endpoint(self, ed):
         ps = [self.visit_parameter(p) for p in ed.parameters]
-        body = ed.request_body.to_openapi_body() if ed.request_body else {}
         return { ed.path: { ed.method.lower(): {
             "operationId":  ed.operation_id,
             "summary":      ed.summary,
             "description":  ed.description,
             "parameters":   ps,
-            **body
         } } }
 
 

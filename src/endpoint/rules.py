@@ -4,19 +4,23 @@ from abc import ABC, abstractmethod
 from re import Pattern
 from typing import Any, Sequence, Union
 
+from ..logging_decorator import log_method_calls
 from ..parameter._enums import ParameterValueType
 from ..strategies import JSONCoercion
 
 
+@log_method_calls()
 class Rule(ABC):
     @abstractmethod
     def validate(self, name: str, value: Any) -> None:
         ...
 
 
+@log_method_calls()
 class TypeRule(Rule):
     def __init__(self, value_type: ParameterValueType):
         self.value_type = value_type
+
     def validate(self, name, value):
         if self.value_type == ParameterValueType.JSON:
             try:
@@ -28,6 +32,7 @@ class TypeRule(Rule):
             raise TypeError(f"Param '{name}': expected {self.value_type.name}, got {type(value).__name__}")
 
 
+@log_method_calls()
 class EnumRule(Rule):
     def __init__(self, choices: Sequence[Any]):
         self.choices = choices
@@ -36,6 +41,7 @@ class EnumRule(Rule):
             raise ValueError(f"Param '{name}': {value!r} not in {self.choices}")
 
 
+@log_method_calls()
 class RangeRule(Rule):
     def __init__(self, mn=None, mx=None):
         self.mn, self.mx = mn, mx
@@ -47,6 +53,7 @@ class RangeRule(Rule):
                 raise ValueError(f"Param '{name}': {value} > max {self.mx}")
 
 
+@log_method_calls()
 class LengthRule(Rule):
     def __init__(self, min_length=None, max_length=None):
         self.min_length, self.max_length = min_length, max_length
@@ -59,6 +66,7 @@ class LengthRule(Rule):
                 raise ValueError(f"Param '{name}': len {l} > max_length {self.max_length}")
 
 
+@log_method_calls()
 class ItemsRule(Rule):
     def __init__(self, min_items=None, max_items=None):
         self.min_items, self.max_items = min_items, max_items
@@ -71,6 +79,7 @@ class ItemsRule(Rule):
                 raise ValueError(f"Param '{name}': items {l} > max_items {self.max_items}")
 
 
+@log_method_calls()
 class EmptyRule(Rule):
     def __init__(self, allow_empty=True):
         self.allow_empty = allow_empty
@@ -79,6 +88,7 @@ class EmptyRule(Rule):
             raise ValueError(f"Param '{name}': empty not allowed")
 
 
+@log_method_calls()
 class BlankRule(Rule):
     def __init__(self, allow_blank=True):
         self.allow_blank = allow_blank
@@ -87,6 +97,7 @@ class BlankRule(Rule):
             raise ValueError(f"Param '{name}': blank not allowed")
 
 
+@log_method_calls()
 class NullRule(Rule):
     def __init__(self, allow_null=True):
         self.allow_null = allow_null
@@ -95,6 +106,7 @@ class NullRule(Rule):
             raise ValueError(f"Param '{name}': null not allowed")
 
 
+@log_method_calls()
 class PatternRule(Rule):
     def __init__(self, pat: Union[str, Pattern]):
         self.pat = re.compile(pat) if isinstance(pat, str) else pat
@@ -103,6 +115,7 @@ class PatternRule(Rule):
             raise ValueError(f"Param '{name}': '{value}' !~ /{self.pat.pattern}/")
 
 
+@log_method_calls()
 class DeprecatedRule(Rule):
     def __init__(self, deprecated=False, desc=""):
         self.deprecated, self.desc = deprecated, desc

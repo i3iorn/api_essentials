@@ -2,9 +2,11 @@ from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
+from src.logging_decorator import log_method_calls
 from src.strategies import Strategy, StandardScopeStrategy
 
 
+@log_method_calls()
 class AbstractCredentials(ABC):
     """
     Abstract class for credentials.
@@ -18,6 +20,7 @@ class AbstractCredentials(ABC):
 
 
 @dataclass
+@log_method_calls()
 class ClientCredentials(AbstractCredentials):
     """
     Class for client credentials.
@@ -55,6 +58,7 @@ class ClientCredentials(AbstractCredentials):
 
 
 @dataclass
+@log_method_calls()
 class UserCredentials(AbstractCredentials):
     """
     Class for user credentials.
@@ -76,6 +80,7 @@ class UserCredentials(AbstractCredentials):
 
 
 @dataclass
+@log_method_calls()
 class TokenCredentials(AbstractCredentials):
     """
     Class for token credentials.
@@ -97,6 +102,7 @@ class TokenCredentials(AbstractCredentials):
 
 
 @dataclass
+@log_method_calls()
 class ApiCredentials(AbstractCredentials):
     """
     Class for API credentials.

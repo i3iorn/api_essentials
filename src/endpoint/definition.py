@@ -1,19 +1,31 @@
 from dataclasses import dataclass
 from typing import Optional, List
 
+from src.logging_decorator import log_method_calls
 from src.parameter import ParameterDefinition
 
 
 @dataclass(frozen=True)
+@log_method_calls()
 class EndpointDefinition:
     """
     Immutable metadata for an API endpoint.
+
+    This class defines the structure of an API endpoint, including its path,
+    HTTP method, description, parameters, and request body.
+    It is used to generate OpenAPI specifications and to validate requests
+    against the defined schema.
+
+    Attributes:
+        path (str): The URL path of the endpoint.
+        method (str): The HTTP method (GET, POST, etc.) for the endpoint.
+        description (Optional[str]): A brief description of the endpoint.
+        parameters (List[ParameterDefinition]): A list of parameters for the endpoint.
     """
     path:            str
     method:          str
     description:     Optional[str]
     parameters:      List[ParameterDefinition]
-    request_body:    Optional[ParameterDefinition] = None
 
     @property
     def operation_id(self):

@@ -2,20 +2,19 @@ from .definition import *
 from .request_builder import *
 from .rules import *
 from .spec import *
+from ..logging_decorator import log_method_calls
 
 
+@log_method_calls()
 class Endpoint:
     def __init__(self, api: "AbstractAPI", definition: EndpointDefinition, appliers: "ApplierRegistry") -> None:
         self.definition = definition
         self.appliers = appliers
         self.api = api
+        self.request_builder = RequestBuilder(definition, api, appliers)
 
     def build_request(self, **parameters) -> httpx.Request:
-        return RequestBuilder(
-            api=self.api,
-            endpoint=self.definition,
-            appliers=self.appliers
-        ).build(
+        return self.request_builder.build(
             **parameters
         )
 

@@ -61,12 +61,12 @@ def log_method_calls(include_dunder: bool = False):
                 nonlocal result
                 result = await method(*args, **kwargs)
                 logger.debug(f"[{method.__qualname__}] Args: {arg_types}, "
-                             f"Return: {type(result).__name__}, Time: {duration:.4f}s", extra={"payload": None})
+                             f"Return: {type(result).__name__}, Time: {duration*1000:.3f}ms", extra={"payload": None})
                 return result
             return run_async()
 
         logger.debug(f"[{method.__qualname__}] Args: {arg_types}, "
-                     f"Return: {type(result).__name__}, Time: {duration:.4f}s", extra={"payload": None})
+                     f"Return: {type(result).__name__}, Time: {duration*1000:.3f}ms", extra={"payload": None})
         return result
 
     return class_decorator

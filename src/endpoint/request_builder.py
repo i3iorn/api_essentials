@@ -1,15 +1,18 @@
+import logging
 from typing import Dict, Any, TYPE_CHECKING
 
 import httpx
 
-from src.utils.url import URL
+from src.auth import AbstractCredentials
 from src.endpoint.definition import EndpointDefinition
-from src.parameter import ApplierRegistry
-
-if TYPE_CHECKING:
-    from src.api import AbstractAPI
+from src.logging_decorator import log_method_calls
+from src.parameter import ApplierRegistry, ParameterLocation
 
 
+logger = logging.getLogger(__name__)
+
+
+@log_method_calls()
 class RequestBuilder:
     """
     Builds and validates an httpx.Request given an EndpointDefinition
@@ -21,15 +24,33 @@ class RequestBuilder:
         api: "AbstractAPI",
         appliers: ApplierRegistry
     ):
+        from src.api import AbstractAPI
+        if not isinstance(endpoint, EndpointDefinition):
+            raise TypeError("endpoint must be an instance of EndpointDefinition")
+        if not isinstance(api, AbstractAPI):
+            raise TypeError("api must be an instance of AbstractAPI")
+        if not isinstance(appliers, ApplierRegistry):
+            raise TypeError("appliers must be an instance of ApplierRegistry")
+
         self.endpoint = endpoint
         self.appliers = appliers
         self.api = api
 
+        self.default_headers = {
+            "User-Agent": self.api.client.user_agent,
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+
     def validate_input(self, data: Dict[str, Any]) -> None:
         # Ensure all required parameters present
         for pd in self.endpoint.parameters:
+            if pd.location == ParameterLocation.HEADER:
+                continue
+
             if pd.required and pd.name not in data:
                 raise ValueError(f"Missing required parameter '{pd.name}'")
+
         # Validate each provided value
         for name, raw in data.items():
             pd = next((p for p in self.endpoint.parameters if p.name == name), None)
@@ -37,21 +58,53 @@ class RequestBuilder:
                 raise ValueError(f"Unexpected parameter '{name}'")
             pd.constraint.validate(pd.name, raw)
 
-    def build(self, data: Dict[str, Any]) -> httpx.Request:
+    def build(self, auth_info: AbstractCredentials, **data: Any) -> httpx.Request:
         self.validate_input(data)
         # Construct URL with path params
-        url = self.api.base_url.add_path(self.endpoint.path)
+        new_path = f"{self.api.client.base_url.path.rstrip('/')}/{self.endpoint.path.lstrip('/')}"
+        url = self.api.client.base_url.copy_with(path=new_path)
         req = httpx.Request(self.endpoint.method, url)
+
         # Apply each parameter
         for pd in self.endpoint.parameters:
+            if pd.name == "Authorization":
+                # Skip Authorization header, handled separately by the API client
+                continue
+
             if pd.name in data:
-                val = pd.constraint.coerce(pd.name, data[pd.name])
+                val = data[pd.name]
+                logger.debug(f"Starting with parameter '{pd.name}' with value '{val}'")
+
+                if pd.constraint.validate(pd.name, val):
+                    val = pd.constraint.coerce(pd.name, val)
+
                 applier = self.appliers.get(pd.location)
                 req = applier.apply(req, pd, val)
-        # Handle request body if defined
-        if self.endpoint.request_body:
-            rb = self.endpoint.request_body
-            raw = data.get(rb.name, rb.constraint.default)
-            val = rb.constraint.coerce(rb.name, raw)
-            req = self.appliers.get(rb.location).apply(req, rb, val)
+
+                logger.debug(f"Finished with parameter '{pd.name}' with value '{val}'")
+
+        # Apply headers
+        for name, value in self.default_headers.items():
+            if name not in req.headers:
+                req.headers[name] = value
+
+        # Set content length
+        if req.content:
+            req.headers["Content-Length"] = str(len(req.content))
+
+        # Add auth info to extensions
+        req.extensions["auth_info"] = auth_info
+
+        logger.debug(
+            "Request built",
+            extra={
+                "payload": {
+                    "method": req.method,
+                    "path": req.url.path,
+                    "headers": req.headers,
+                    "body": req.content,
+                }
+            }
+        )
+
         return req

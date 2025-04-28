@@ -8,22 +8,19 @@ from ._enums import ParameterLocation, ParameterValueType
 
 @dataclass(frozen=True)
 class ParameterDefinition:
-    name:        str
-    location: ParameterLocation
-    required:    bool
-    description: Optional[str]
-    constraint: ParameterConstraint
-    deprecated:  bool = False
-    deprecated_description: Optional[str] = None
+    name:                   str
+    location:               ParameterLocation
+    required:               bool
+    description:            Optional[str]
+    constraint:             ParameterConstraint
+    deprecated:             bool                = False
+    deprecated_description: Optional[str]       = None
 
     def __post_init__(self):
         if self.deprecated and self.deprecated_description:
             warnings.warn(f"Parameter '{self.name}' deprecated: {self.deprecated_description}", DeprecationWarning)
         if self.location is ParameterLocation.PATH and not self.required:
             raise ValueError("Path parameters must be required")
-        if self.location is ParameterLocation.BODY and \
-           self.constraint.value_type not in {ParameterValueType.OBJECT, ParameterValueType.JSON}:
-            raise ValueError("Body params must be OBJECT or JSON")
 
     def to_openapi(self) -> Dict[str, Any]:
         schema = {"type": self.constraint.value_type.name.lower()}

@@ -47,3 +47,10 @@ class ParameterValueType(IsValidEnumMixin, Enum):
         if self is ParameterValueType.JSON:
             return JSONCoercion().apply(raw)
         return SimpleCoercion(self.value).apply(raw)
+
+    @classmethod
+    def from_name(cls, name: str) -> "ParameterValueType":
+        for tn, vt in cls.__members__.items():
+            if tn.lower() == name.lower() or name.lower() == str(vt.value.__name__).lower():
+                return vt
+        raise ValueError(f"Invalid parameter name {name}")
