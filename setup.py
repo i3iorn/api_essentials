@@ -7,7 +7,6 @@ setup(
     author="Björn",
     author_email="bjorn@schrammel.dev",
     description="A Python package for API essentials.",
-    long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     url="",
     packages=find_packages(),
