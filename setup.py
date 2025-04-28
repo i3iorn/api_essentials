@@ -22,7 +22,7 @@ setup(
         "pytest-asyncio",
         "black",
         "flake8",
-        "mypy"
+        "openapi_core"
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
