@@ -11,7 +11,7 @@ from src.client import APIClient
 from src.endpoint import EndpointDefinition, Endpoint
 from src.flags import ALLOW_UNSECURE
 from src.logging_decorator import log_method_calls
-from src.parameter import ParameterFactoryService, applier_registry
+from src.parameter import ParameterFactoryService
 
 
 class MyFormatter(logging.Formatter):
@@ -100,8 +100,7 @@ class RGSDecisioning(AbstractAPI):
         )
         b2b_se_decision = Endpoint(
             api=self,
-            definition=b2b_se_decision_definition,
-            appliers=applier_registry
+            definition=b2b_se_decision_definition
         )
 
 
