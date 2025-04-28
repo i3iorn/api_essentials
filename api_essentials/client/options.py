@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, Union
 
-from src.logging_decorator import log_method_calls
+from api_essentials.logging_decorator import log_method_calls
 
 HttpMethod = Union["get", "post", "put", "patch", "delete", "head", "options"]
 

@@ -5,13 +5,13 @@ from typing import List
 
 from httpx import URL
 
-from src.api import AbstractAPI
-from src.auth import OAuth2Auth, ClientCredentials
-from src.client import APIClient
-from src.endpoint import EndpointDefinition, Endpoint
-from src.flags import ALLOW_UNSECURE
-from src.logging_decorator import log_method_calls
-from src.parameter import ParameterFactoryService
+from api_essentials.api import AbstractAPI
+from api_essentials.auth import OAuth2Auth, ClientCredentials
+from api_essentials.client import APIClient
+from api_essentials.endpoint import EndpointDefinition, Endpoint
+from api_essentials.flags import ALLOW_UNSECURE
+from api_essentials.logging_decorator import log_method_calls
+from api_essentials.parameter import ParameterFactoryService
 
 
 class MyFormatter(logging.Formatter):

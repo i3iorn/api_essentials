@@ -1,6 +1,6 @@
 import unittest
 
-from src.auth.info import UserCredentials, ClientCredentials, TokenCredentials, ApiCredentials
+from api_essentials.auth.info import UserCredentials, ClientCredentials, TokenCredentials, ApiCredentials
 
 
 class TestCredentials(unittest.TestCase):

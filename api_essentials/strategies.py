@@ -6,7 +6,7 @@ from typing import Optional, Callable, Any, Type
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, RetryCallState
 
-from src.logging_decorator import log_method_calls
+from api_essentials.logging_decorator import log_method_calls
 
 
 class Strategy(ABC):

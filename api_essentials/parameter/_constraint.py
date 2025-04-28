@@ -3,8 +3,8 @@ from re import Pattern
 from typing import Optional, Sequence, Any, Union, List
 
 from ._enums import ParameterValueType
-from src.endpoint.rules import (Rule, NullRule, TypeRule, EnumRule, RangeRule, LengthRule, ItemsRule, EmptyRule, BlankRule,
-                                PatternRule, DeprecatedRule)
+from api_essentials.endpoint.rules import (Rule, NullRule, TypeRule, EnumRule, RangeRule, LengthRule, ItemsRule, EmptyRule, BlankRule,
+                                           PatternRule, DeprecatedRule)
 from ..logging_decorator import log_method_calls
 
 

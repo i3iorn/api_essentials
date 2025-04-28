@@ -3,10 +3,10 @@ from typing import Dict, Any, TYPE_CHECKING
 
 import httpx
 
-from src.auth import AbstractCredentials
-from src.endpoint.definition import EndpointDefinition
-from src.logging_decorator import log_method_calls
-from src.parameter import applier_registry
+from api_essentials.auth import AbstractCredentials
+from api_essentials.endpoint.definition import EndpointDefinition
+from api_essentials.logging_decorator import log_method_calls
+from api_essentials.parameter import applier_registry
 
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ class RequestBuilder:
         endpoint: EndpointDefinition,
         api: "AbstractAPI"
     ):
-        from src.api import AbstractAPI
+        from api_essentials.api import AbstractAPI
         if not isinstance(endpoint, EndpointDefinition):
             raise TypeError("endpoint must be an instance of EndpointDefinition")
         if not isinstance(api, AbstractAPI):

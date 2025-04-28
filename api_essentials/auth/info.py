@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
-from src.logging_decorator import log_method_calls
-from src.strategies import Strategy, StandardScopeStrategy
+from api_essentials.logging_decorator import log_method_calls
+from api_essentials.strategies import Strategy, StandardScopeStrategy
 
 
 @log_method_calls()

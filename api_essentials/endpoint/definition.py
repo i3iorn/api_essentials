@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 from typing import Optional, List, TYPE_CHECKING
 
-from src.logging_decorator import log_method_calls
+from api_essentials.logging_decorator import log_method_calls
 
 if TYPE_CHECKING:
-    from src.parameter import ParameterDefinition
+    from api_essentials.parameter import ParameterDefinition
 
 
 @dataclass(frozen=True)

@@ -7,10 +7,10 @@ from typing import Generator, Mapping, Dict, Callable, Optional, List, Tuple, As
 import httpx
 from httpx import Auth, Request, Response, URL
 
-from src.auth.info import ClientCredentials
-from src.logging_decorator import log_method_calls
-from src.strategies import Strategy
-from src.utils import rebuild_request
+from api_essentials.auth.info import ClientCredentials
+from api_essentials.logging_decorator import log_method_calls
+from api_essentials.strategies import Strategy
+from api_essentials.utils import rebuild_request
 
 GRACE_PERIOD = 60  # seconds
 DEFAULT_TOKEN_NAME = "access_token"

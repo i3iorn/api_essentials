@@ -2,7 +2,7 @@ from enum import Enum
 from functools import lru_cache
 from typing import Any, List
 
-from src.strategies import SimpleCoercion, JSONCoercion
+from api_essentials.strategies import SimpleCoercion, JSONCoercion
 
 
 class IsValidEnumMixin:

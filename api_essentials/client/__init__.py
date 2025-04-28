@@ -4,11 +4,11 @@ from typing import Callable, Dict, List, Optional, Tuple, Mapping
 import httpx
 from httpx import URL
 
-from src.response import Response
-from src.client.options import RequestOptions
-from src.strategies import ErrorStrategy, NoRetries, RetryStrategy
-from src.flags import USE_DEFAULT_POST_RESPONSE_HOOK, ALLOW_UNSECURE, Flag
-from src.logging_decorator import log_method_calls
+from api_essentials.response import Response
+from api_essentials.client.options import RequestOptions
+from api_essentials.strategies import ErrorStrategy, NoRetries, RetryStrategy
+from api_essentials.flags import USE_DEFAULT_POST_RESPONSE_HOOK, ALLOW_UNSECURE, Flag
+from api_essentials.logging_decorator import log_method_calls
 
 
 @log_method_calls()

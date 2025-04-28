@@ -1,8 +1,8 @@
 from typing import List, Dict, Any
 
-from src.endpoint.definition import EndpointDefinition
-from src.logging_decorator import log_method_calls
-from src.parameter import OpenApiVisitor
+from api_essentials.endpoint.definition import EndpointDefinition
+from api_essentials.logging_decorator import log_method_calls
+from api_essentials.parameter import OpenApiVisitor
 
 
 @log_method_calls()
