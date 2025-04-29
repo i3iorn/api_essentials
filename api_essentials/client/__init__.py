@@ -1,3 +1,4 @@
+import re
 from typing import Union
 import logging
 from typing import Callable, Dict, List, Optional, Tuple, Mapping
@@ -72,6 +73,19 @@ class APIClient:
     @property
     def user_agent(self) -> str:
         return self._user_agent
+
+    def add_host_prefix(self, host_prefix: str) -> None:
+        if not isinstance(host_prefix, str):
+            raise TypeError
+        if not re.fullmatch(
+            r"[A-Za-z-_.]+",
+            host_prefix
+        ):
+            raise ValueError
+
+        self._base_url = self.base_url.copy_with(
+            host=f"{host_prefix}{self.base_url.host}"
+        )
 
     async def request(self, request: httpx.Request, **kwargs) -> Response:
         """
