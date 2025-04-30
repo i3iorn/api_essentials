@@ -2,7 +2,12 @@ from api_essentials.auth import OAuth2Auth, ClientCredentials, UserCredentials, 
 from api_essentials.client import APIClient
 from api_essentials.endpoint import Endpoint
 from api_essentials.parameter import ParameterFactoryService as ParameterFactory
-from api_essentials.flags import USE_DEFAULT_POST_RESPONSE_HOOK, ALLOW_UNSECURE, FORCE_HTTPS
+from api_essentials.flags import (
+    USE_DEFAULT_POST_RESPONSE_HOOK,
+    ALLOW_UNSECURE,
+    FORCE_HTTPS,
+    TRUST_UNDEFINED_PARAMETERS
+)
 
 
 
@@ -17,7 +22,9 @@ __all__ = [
     "APIClient",
     "Endpoint",
     "ParameterFactory",
+
     "USE_DEFAULT_POST_RESPONSE_HOOK",
     "ALLOW_UNSECURE",
-    "FORCE_HTTPS"
+    "FORCE_HTTPS",
+    "TRUST_UNDEFINED_PARAMETERS"
 ]
