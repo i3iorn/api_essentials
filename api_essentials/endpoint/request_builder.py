@@ -83,7 +83,6 @@ class RequestBuilder:
 
                     applier = applier_registry.get(pd.location)
                     req = applier.apply(req, pd, val)
-                    print(req.content)
 
                     logger.debug(f"Finished with parameter '{pd.name}' with value '{val}'")
 
