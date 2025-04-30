@@ -4,8 +4,10 @@ from typing import Union, Any
 import httpx
 
 from api_essentials.auth.flow import AUTHORIZATION_HEADER_NAME
+from api_essentials.logging_decorator import log_method_calls
 
 
+@log_method_calls()
 class HTTPFormatter:
     @classmethod
     def _format_request_line(cls, request: httpx.Request, http_version: str) -> str:
@@ -88,6 +90,7 @@ class HTTPFormatter:
         return "\r\n".join(parts)
 
 
+@log_method_calls()
 class Response(httpx.Response):
     # Resolve the httpx.Response docstring
 
