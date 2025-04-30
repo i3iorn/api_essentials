@@ -2,8 +2,10 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from ._definition import ParameterDefinition
+from ..logging_decorator import log_method_calls
 
 
+@log_method_calls()
 class SpecVisitor(ABC):
     @abstractmethod
     def visit_parameter(self, pd: ParameterDefinition) -> Any:
@@ -13,6 +15,7 @@ class SpecVisitor(ABC):
         ...
 
 
+@log_method_calls()
 class OpenApiVisitor(SpecVisitor):
     def visit_parameter(self, pd):
         return pd.to_openapi()
@@ -26,6 +29,7 @@ class OpenApiVisitor(SpecVisitor):
         } } }
 
 
+@log_method_calls()
 class JsonSchemaVisitor(SpecVisitor):
     def visit_parameter(self, pd):
         return pd.to_json_schema()
