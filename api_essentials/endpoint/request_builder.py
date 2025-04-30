@@ -111,5 +111,8 @@ class RequestBuilder:
                 }
             }
         )
+        # Throw an exception if there was data sent but no content
+        if len(data) > 0 and not len(req.content):
+            raise ValueError(f"Request has no content but data was sent: {json.dumps(data)}")
 
         return req
