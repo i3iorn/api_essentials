@@ -5,8 +5,10 @@ from typing import Dict, Any
 from ._constraint import ParameterConstraint
 from ._definition import ParameterDefinition
 from ._enums import ParameterLocation, ParameterValueType
+from ..logging_decorator import log_method_calls
 
 
+@log_method_calls()
 class ParameterFactoryService:
     """
     DI-friendly factory for ParameterDefinition.
