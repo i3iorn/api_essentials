@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 
 setup(
-    name="ApiEssentials",
+    name="api-essentials",
     version="0.1.0",
     author="Björn",
     author_email="bjorn@schrammel.dev",
