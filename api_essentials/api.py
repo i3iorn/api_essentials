@@ -35,7 +35,7 @@ class BaseAPI:
         
         self._endpoints = value
         
-    async def request(self, auth_info: AbstractCredentials, endpoint: Endpoint, **kwargs) -> Response:
+    async def request(self, *flags, auth_info: AbstractCredentials, endpoint: Endpoint, **kwargs) -> Response:
         """
         Make a request to the API.
 
@@ -43,11 +43,12 @@ class BaseAPI:
         :return: Response object
         """
         return await self.client.request(
-            endpoint.build_request(auth_info=auth_info, **kwargs)
+            endpoint.build_request(*flags, auth_info=auth_info, **kwargs)
         )
 
 
 
+@log_method_calls()
 class APIRegistry:
     """
     Registry for API classes.
