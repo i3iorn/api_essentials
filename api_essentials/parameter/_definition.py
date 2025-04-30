@@ -3,12 +3,14 @@ from dataclasses import dataclass
 from typing import Optional, Dict, Any, TYPE_CHECKING
 
 from ._enums import ParameterLocation
+from ..logging_decorator import log_method_calls
 
 if TYPE_CHECKING:
     from ._constraint import ParameterConstraint
 
 
 @dataclass(frozen=True)
+@log_method_calls()
 class ParameterDefinition:
     name:                   str
     location:               ParameterLocation
