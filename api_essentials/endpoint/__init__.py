@@ -13,9 +13,9 @@ class Endpoint:
         self.api = api
         self.request_builder = RequestBuilder(definition, api)
 
-    def build_request(self, **parameters) -> httpx.Request:
+    def build_request(self, *flags, **parameters) -> httpx.Request:
         return self.request_builder.build(
-            **parameters
+            *flags, **parameters
         )
 
     def __repr__(self):
