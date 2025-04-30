@@ -1,14 +1,14 @@
 from typing import Dict, Any, List
 
-from api_essentials.api import AbstractAPI
+from api_essentials.api import BaseAPI
 from api_essentials.endpoint import Endpoint, EndpointDefinition
 from api_essentials.parameter import ParameterValueType, ParameterConstraint, ParameterDefinition, ParameterLocation
 
 
 class EndpointFactory:
     @staticmethod
-    def from_openapi(api: AbstractAPI, api_spec: Dict[str, Any]) -> List[Endpoint]:
-        endpoints = []
+    def from_openapi(api: BaseAPI, api_spec: Dict[str, Any]) -> Dict[str, Endpoint]:
+        endpoints = {}
 
         paths = api_spec.get("paths", {})
         if not isinstance(paths, dict):
@@ -72,6 +72,6 @@ class EndpointFactory:
                 )
 
                 endpoint = Endpoint(api=api, definition=definition)
-                endpoints.append(endpoint)
+                endpoints[path] = endpoint
 
         return endpoints

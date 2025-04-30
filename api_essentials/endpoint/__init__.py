@@ -8,7 +8,7 @@ from ..logging_decorator import log_method_calls
 
 @log_method_calls()
 class Endpoint:
-    def __init__(self, api: "AbstractAPI", definition: EndpointDefinition) -> None:
+    def __init__(self, api: "BaseAPI", definition: EndpointDefinition) -> None:
         self.definition = definition
         self.api = api
         self.request_builder = RequestBuilder(definition, api)

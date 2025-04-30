@@ -1,53 +1,37 @@
 import inspect
-from abc import abstractmethod, ABC
-from typing import List
+from typing import List, Dict
 
-import httpx
-from httpx import URL
-
-from .auth import ClientCredentials, AbstractCredentials
-from .auth.flow import validate_auth_class
-from .client import APIClient, RequestOptions
+from .auth import AbstractCredentials
+from .client import APIClient
 from .endpoint import Endpoint
-from .flags import ALLOW_UNSECURE
 from .logging_decorator import log_method_calls
 from .response import Response
 
 
-def requires_client(func):
-    """
-    Decorator to ensure that the API client is initialized before calling a method.
-    """
-    if inspect.iscoroutinefunction(func):
-        async def async_wrapper(self, *args, **kwargs):
-            if self.client is None:
-                raise RuntimeError("API client is not initialized.")
-            return await func(self, *args, **kwargs)
-
-        return async_wrapper
-    else:
-        def sync_wrapper(self, *args, **kwargs):
-            if self.client is None:
-                raise RuntimeError("API client is not initialized.")
-            return func(self, *args, **kwargs)
-
-        return sync_wrapper
-
-
 @log_method_calls()
-class AbstractAPI(ABC):
+class BaseAPI:
     def __init__(self, client: APIClient):
         self.client = client
+        self._endpoints: Dict[str, Endpoint] = {}
 
-    @property
-    @abstractmethod
-    def endpoints(self) -> List[Endpoint]:
+    def get_endpoint(self, name: str) -> Endpoint:
         """Return a list of API endpoints."""
-        pass
+        if name not in self._endpoints:
+            raise KeyError(f"Endpoint '{name}' not found in API.")
+        
+        return self._endpoints[name]
 
     async def close(self):
         await self.client.close()
 
+    def set_endpoints(self, value: Dict[str, Endpoint]) -> None:
+        if not isinstance(value, dict):
+            raise ValueError("Endpoints must be a dictionary")
+        if not all(isinstance(k, str) and isinstance(v, Endpoint) for k, v in value.items()):
+            raise ValueError("Endpoints must be a dictionary of string keys and Endpoint values")
+        
+        self._endpoints = value
+        
     async def request(self, auth_info: AbstractCredentials, endpoint: Endpoint, **kwargs) -> Response:
         """
         Make a request to the API.
@@ -58,15 +42,6 @@ class AbstractAPI(ABC):
         return await self.client.request(
             endpoint.build_request(auth_info=auth_info, **kwargs)
         )
-
-
-class BaseApi(AbstractAPI):
-    @property
-    def endpoints(self) -> List[Endpoint]:
-        return self._endpoints
-
-    def set_endpoints(self, value: List[Endpoint]) -> None:
-        self._endpoints = value
 
 
 
@@ -82,8 +57,8 @@ class APIRegistry:
         Register an API class.
         :param api_class: API class to register
         """
-        if not issubclass(api_class, AbstractAPI):
-            raise ValueError("API class must be a subclass of AbstractAPI.")
+        if not issubclass(api_class, BaseAPI):
+            raise ValueError("API class must be a subclass of BaseAPI.")
         self.apis[api_class.__name__] = api_class
 
     def get_api(self, name: str) -> type:

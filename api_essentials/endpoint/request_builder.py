@@ -23,13 +23,13 @@ class RequestBuilder:
     def __init__(
         self,
         endpoint: EndpointDefinition,
-        api: "AbstractAPI"
+        api: "BaseAPI"
     ):
-        from api_essentials.api import AbstractAPI
+        from api_essentials.api import BaseAPI
         if not isinstance(endpoint, EndpointDefinition):
             raise TypeError("endpoint must be an instance of EndpointDefinition")
-        if not isinstance(api, AbstractAPI):
-            raise TypeError("api must be an instance of AbstractAPI")
+        if not isinstance(api, BaseAPI):
+            raise TypeError("api must be an instance of BaseAPI")
 
         self.endpoint = endpoint
         self.api = api

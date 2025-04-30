@@ -22,7 +22,8 @@ setup(
         "pytest-asyncio",
         "black",
         "flake8",
-        "openapi_core"
+        "openapi_core",
+        "openapi_spec_validator",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

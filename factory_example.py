@@ -13,7 +13,7 @@ logging.basicConfig(
 )
 
 async def main():
-    with open(r"C:\Users\schrammelb\OneDrive - Dun and Bradstreet\Downloads\swagger.yaml", "r", encoding="utf-8") as f:
+    with open(r"C:\Users\micro\Downloads\swagger.yaml", "r", encoding="utf-8") as f:
         openapi_spec = yaml.safe_load(f)
 
 
@@ -25,7 +25,7 @@ async def main():
         scopes=["rgs-decision"]
     )
 
-    endpoint = [e for e in my_api.endpoints if e.definition.path == "/company/se"][0]
+    endpoint = my_api.get_endpoint("/company/se")
 
     response = await my_api.request(
         auth_info=credentials,
