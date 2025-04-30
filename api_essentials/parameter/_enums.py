@@ -2,9 +2,11 @@ from enum import Enum
 from functools import lru_cache
 from typing import Any, List
 
+from api_essentials.logging_decorator import log_method_calls
 from api_essentials.strategies import SimpleCoercion, JSONCoercion
 
 
+@log_method_calls()
 class IsValidEnumMixin:
     @classmethod
     def is_valid(cls, value: Any) -> bool:
@@ -23,6 +25,7 @@ class IsValidEnumMixin:
         return [m.value for m in cls]
 
 
+@log_method_calls()
 class ParameterLocation(IsValidEnumMixin, Enum):
     QUERY     = "query"
     HEADER    = "header"
@@ -33,6 +36,7 @@ class ParameterLocation(IsValidEnumMixin, Enum):
     JSON      = "json"
 
 
+@log_method_calls()
 class ParameterValueType(IsValidEnumMixin, Enum):
     JSON    = str
     STRING  = str
