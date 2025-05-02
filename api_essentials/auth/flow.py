@@ -60,6 +60,7 @@ class OAuth2Auth(Auth):
         self.token: str | None              = None
         self.token_data: Dict | None        = None
         self.expires_at: datetime | None    = datetime.now()
+        self.token_requests: List[httpx.Request] = []
 
     def _validate_input(
             self,
@@ -178,7 +179,15 @@ class OAuth2Auth(Auth):
                 timeout=kwargs.get("timeout", 10.0),
                 verify=kwargs.get("verify", True)
         ) as client:
-            token_response = await client.post(self.token_url, data=data, headers=headers)
+            request = client.build_request(
+                method="POST",
+                url=self.token_url,
+                data=data,
+                headers=headers,
+                params=kwargs.get("params")
+            )
+            self.token_requests.append(request)
+            token_response = await client.send(request)
 
         if token_response.status_code != 200:
             logging.error(
