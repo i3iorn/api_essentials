@@ -1,5 +1,5 @@
 import inspect
-from typing import Union, Any
+from typing import Union, Any, Dict
 
 import httpx
 
@@ -101,6 +101,16 @@ class Response(httpx.Response):
 
     def __init__(self, response: httpx.Response) -> None:
         self._response = response
+
+    def as_http_format(self) -> Dict[str, str]:
+        """
+        Convert the httpx.Response into a formatted string representation.
+        This includes both the request and response in raw HTTP format.
+        """
+        return {
+            "request": HTTPFormatter.format_raw_http_request(self._response),
+            "response": HTTPFormatter.format_raw_http_response(self._response)
+        }
 
     def print_http(self):
         print(
