@@ -111,7 +111,7 @@ class Response(httpx.Response):
             "request": HTTPFormatter.format_raw_http_request(self._response.request),
             "response": HTTPFormatter.format_raw_http_response(self._response),
             "token_request": HTTPFormatter.format_raw_http_request(self._response.request.extensions.get("token_request", None)),
-            "token_response": HTTPFormatter.format_raw_http_request(self._response.request.extensions.get("token_response", None)),
+            "token_response": HTTPFormatter.format_raw_http_response(self._response.request.extensions.get("token_response", None)),
         }
 
     def print_http(self):
