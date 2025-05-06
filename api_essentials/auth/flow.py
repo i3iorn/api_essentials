@@ -138,7 +138,8 @@ class OAuth2Auth(Auth):
         if self.has_expired():
             await self.refresh_token(request.extensions.get("auth_info"))
 
-        request
+        request.extensions["token_requests"] = self.token_requests
+        request.extensions["token_responses"] = self.token_responses
         request.headers[AUTHORIZATION_HEADER_NAME] = f"Bearer {self.token}"
         response = yield request
 
