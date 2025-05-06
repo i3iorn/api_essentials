@@ -1,4 +1,5 @@
 import inspect
+import json
 from typing import Union, Any, Dict
 
 import httpx
@@ -42,6 +43,16 @@ class HTTPFormatter:
             return ""
         if isinstance(body, bytes):
             return body.decode("utf-8", errors="replace")
+
+        body_dict = json.loads(body)
+        for key, value in body_dict.items():
+            if any(
+                ["token" in key.lower(),
+                "secret" in key.lower(),
+                "password" in key.lower()]
+            ):
+                body_dict[key] = "[secure]"
+        body = json.dumps(body_dict, indent=4, ensure_ascii=False)
         return body
 
     @classmethod
