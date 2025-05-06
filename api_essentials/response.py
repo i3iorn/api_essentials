@@ -45,7 +45,7 @@ class HTTPFormatter:
         return body
 
     @classmethod
-    def format_raw_http_request(cls, response: httpx.Response) -> str:
+    def format_raw_http_request(cls, request: httpx.Request) -> str:
         """
         Convert an httpx.Response into the full raw HTTP request text, including:
           1. Request-Line (method, path+query, version)
@@ -55,13 +55,12 @@ class HTTPFormatter:
         :param response: The httpx.Response whose underlying request we want to reconstruct.
         :return: A single string containing the raw HTTP request.
         """
-        req = response.request
         # Use the negotiated HTTP version from the response (e.g. "1.1" or "2")
-        http_version = getattr(response, "http_version", "1.1")
+        http_version = getattr(request, "http_version", "1.1")
 
-        request_line = cls._format_request_line(req, http_version)
-        headers = cls._format_headers(req.headers)
-        body = cls._format_body(req.content)
+        request_line = cls._format_request_line(request, http_version)
+        headers = cls._format_headers(request.headers)
+        body = cls._format_body(request.content)
 
         # Assemble parts, ensuring CRLF separation
         parts = [request_line, headers, "", body]
@@ -109,13 +108,15 @@ class Response(httpx.Response):
         This includes both the request and response in raw HTTP format.
         """
         return {
-            "request": HTTPFormatter.format_raw_http_request(self._response),
-            "response": HTTPFormatter.format_raw_http_response(self._response)
+            "request": HTTPFormatter.format_raw_http_request(self._response.request),
+            "response": HTTPFormatter.format_raw_http_response(self._response),
+            "token_request": HTTPFormatter.format_raw_http_request(self._response.request.extensions.get("token_request", None)),
+            "token_response": HTTPFormatter.format_raw_http_request(self._response.request.extensions.get("token_response", None)),
         }
 
     def print_http(self):
         print(
-            HTTPFormatter.format_raw_http_request(self._response),
+            HTTPFormatter.format_raw_http_request(self._response.request),
             HTTPFormatter.format_raw_http_response(self._response),
             sep="\n\n",
         )

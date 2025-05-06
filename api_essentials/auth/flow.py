@@ -60,8 +60,8 @@ class OAuth2Auth(Auth):
         self.token: str | None              = None
         self.token_data: Dict | None        = None
         self.expires_at: datetime | None    = datetime.now()
-        self.token_requests: List[httpx.Request] = []
-        self.token_responses: List[httpx.Response] = []
+        self.token_request: httpx.Request | None  = None
+        self.token_response: httpx.Response | None = None
 
     def _validate_input(
             self,
@@ -138,8 +138,8 @@ class OAuth2Auth(Auth):
         if self.has_expired():
             await self.refresh_token(request.extensions.get("auth_info"))
 
-        request.extensions["token_requests"] = self.token_requests
-        request.extensions["token_responses"] = self.token_responses
+        request.extensions["token_request"] = self.token_request
+        request.extensions["token_response"] = self.token_response
         request.headers[AUTHORIZATION_HEADER_NAME] = f"Bearer {self.token}"
         response = yield request
 
@@ -189,9 +189,9 @@ class OAuth2Auth(Auth):
                 headers=headers,
                 params=kwargs.get("params")
             )
-            self.token_requests.append(request)
+            self.token_request = request
             token_response = await client.send(request)
-            self.token_responses.append(token_response)
+            self.token_response = token_response
 
         if token_response.status_code != 200:
             logging.error(
