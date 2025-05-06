@@ -1,4 +1,5 @@
 import re
+import time
 from typing import Union
 import logging
 from typing import Callable, Dict, List, Optional, Tuple, Mapping
@@ -107,8 +108,10 @@ class APIClient:
             return await self.client.send(request)
 
         wrapped = self._retry_strategy.apply(make_request)
+        start = time.perf_counter()
         response = await wrapped()
-        return Response(response)
+        end = time.perf_counter()
+        return Response(response, end - start)
 
     async def close(self) -> None:
         """Close the internal connection pool."""

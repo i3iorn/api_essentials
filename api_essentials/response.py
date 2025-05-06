@@ -92,15 +92,16 @@ class HTTPFormatter:
 
 @log_method_calls()
 class Response(httpx.Response):
-    # Resolve the httpx.Response docstring
+    def __init__(self, response: httpx.Response, request_time: float) -> None:
+        self._response = response
+        self._request_time = request_time
 
     @property
-    def __doc__(self):
-        # document the child object, not the wrapper
-        return inspect.getdoc(self._response)
-
-    def __init__(self, response: httpx.Response) -> None:
-        self._response = response
+    def perf_request_time(self) -> float:
+        """
+        Get the time taken for the request in milliseconds.
+        """
+        return self._request_time
 
     def as_http_format(self) -> Dict[str, str]:
         """
