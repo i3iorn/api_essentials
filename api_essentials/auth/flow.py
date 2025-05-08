@@ -5,8 +5,9 @@ from datetime import datetime, timedelta
 from typing import Generator, Mapping, Dict, Callable, Optional, List, Tuple, AsyncGenerator
 
 import httpx
-from httpx import Auth, Request, Response, URL
+from httpx import Auth, Request, Response as httpResponse, URL
 
+from api_essentials.response import Response
 from api_essentials.auth.info import ClientCredentials
 from api_essentials.logging_decorator import log_method_calls
 from api_essentials.strategies import Strategy
@@ -61,7 +62,7 @@ class OAuth2Auth(Auth):
         self.token_data: Dict | None        = None
         self.expires_at: datetime | None    = datetime.now()
         self.token_request: httpx.Request | None  = None
-        self.token_response: httpx.Response | None = None
+        self.token_response: Response | None = None
 
     def _validate_input(
             self,
@@ -191,7 +192,7 @@ class OAuth2Auth(Auth):
             )
             self.token_request = request
             token_response = await client.send(request)
-            self.token_response = token_response
+            self.token_response = Response(token_response)
 
         if token_response.status_code != 200:
             logging.error(
