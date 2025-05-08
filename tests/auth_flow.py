@@ -3,7 +3,8 @@ from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta
 
 from api_essentials.auth.info import ClientCredentials
-from api_essentials.auth.flow import OAuth2Auth, GRACE_PERIOD
+from api_essentials.auth.flow import OAuth2Auth
+from api_essentials.constants import GRACE_PERIOD
 
 
 class TestOAuth2Auth(unittest.TestCase):

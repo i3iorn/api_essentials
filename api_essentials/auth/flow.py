@@ -3,21 +3,19 @@ import logging
 import time
 from datetime import datetime, timedelta
 
-from typing import Generator, Mapping, Dict, Callable, Optional, List, Tuple, AsyncGenerator
+from typing import Mapping, Dict, Callable, Optional, List, AsyncGenerator
 
 import httpx
-from httpx import Auth, Request, Response as httpResponse, URL
+from httpx import Auth, Request, URL
 
+from api_essentials.constants import AUTHORIZATION_HEADER_NAME, GRACE_PERIOD, DEFAULT_TOKEN_NAME, \
+    DEFAULT_EXPIRATION_NAME
 from api_essentials.response import Response
 from api_essentials.auth.info import ClientCredentials
 from api_essentials.logging_decorator import log_method_calls
 from api_essentials.strategies import Strategy
 from api_essentials.utils import rebuild_request
 
-GRACE_PERIOD = 60  # seconds
-DEFAULT_TOKEN_NAME = "access_token"
-DEFAULT_EXPIRATION_NAME = "expires_in"
-AUTHORIZATION_HEADER_NAME = "Authorization"
 
 @log_method_calls()
 class OAuth2Auth(Auth):

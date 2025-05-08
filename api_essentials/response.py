@@ -4,7 +4,7 @@ from typing import Union, Any, Dict
 
 import httpx
 
-from api_essentials.auth.flow import AUTHORIZATION_HEADER_NAME
+from api_essentials.constants import AUTHORIZATION_HEADER_NAME
 from api_essentials.logging_decorator import log_method_calls
 
 

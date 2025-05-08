@@ -5,7 +5,7 @@ from typing import Dict, Any, TYPE_CHECKING
 import httpx
 
 from api_essentials.auth import AbstractCredentials
-from api_essentials.auth.flow import AUTHORIZATION_HEADER_NAME
+from api_essentials.constants import AUTHORIZATION_HEADER_NAME
 from api_essentials.endpoint.definition import EndpointDefinition
 from api_essentials.flags import TRUST_UNDEFINED_PARAMETERS
 from api_essentials.logging_decorator import log_method_calls
