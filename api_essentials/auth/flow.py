@@ -1,5 +1,6 @@
 import base64
 import logging
+import time
 from datetime import datetime, timedelta
 
 from typing import Generator, Mapping, Dict, Callable, Optional, List, Tuple, AsyncGenerator
@@ -183,6 +184,7 @@ class OAuth2Auth(Auth):
                 timeout=kwargs.get("timeout", 10.0),
                 verify=kwargs.get("verify", True)
         ) as client:
+            start = time.perf_counter()
             request = client.build_request(
                 method="POST",
                 url=self.token_url,
@@ -190,9 +192,10 @@ class OAuth2Auth(Auth):
                 headers=headers,
                 params=kwargs.get("params")
             )
+            end = time.perf_counter()
             self.token_request = request
             token_response = await client.send(request)
-            self.token_response = Response(token_response)
+            self.token_response = Response(token_response, end - start)
 
         if token_response.status_code != 200:
             logging.error(
