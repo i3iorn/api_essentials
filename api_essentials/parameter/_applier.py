@@ -89,10 +89,10 @@ class ParameterApplier(ABC):
 class QueryApplier(ParameterApplier):
     def apply(self, req, pd, val):
         if isinstance(req.url, str):
-            req.url = req.url.replace(f"{{{pd.name}}}", str(val))
-        elif isinstance(req.url, URL):
-            query = req.url.query.copy()
-            query[pd.name] = str(val)
+            req.url = URL(req.url)
+
+        if isinstance(req.url, URL):
+            query = b"?".join([req.url.query, pd.name.encode() + b"=" + str(val).encode()])
             req.url = req.url.copy_with(query=query)
         else:
             raise ValueError(f"Unsupported URL type: {type(req.url)}")
