@@ -18,6 +18,52 @@ from api_essentials.utils import rebuild_request
 
 
 @log_method_calls()
+class TokenAuth(Auth):
+    """
+    Token authentication.
+
+    This class adds an Authorization header using the Bearer scheme.
+    It is used for APIs that require token authentication.
+
+    Attributes:
+        token (str): The token to be used for authentication.
+    """
+    def __init__(self, token: str, header_name: str = "API-KEY") -> None:
+        self.token = token
+        self.header_name = header_name
+
+    def async_auth_flow(
+        self, request: Request
+    ) -> AsyncGenerator[Request, Response]:
+        """
+        Asynchronous authentication flow.
+
+        Args:
+            request (Request): The HTTP request to be authenticated.
+
+        Yields:
+            Request: The authenticated request.
+        """
+        request.headers[self.header_name] = self.token
+        yield request
+
+    def sync_auth_flow(
+        self, request: Request
+    ) -> Response:
+        """
+        Synchronous authentication flow.
+
+        Args:
+            request (Request): The HTTP request to be authenticated.
+
+        Returns:
+            Response: The authenticated request.
+        """
+        request.headers[self.header_name] = self.token
+        return request
+
+
+@log_method_calls()
 class OAuth2Auth(Auth):
     """
     OAuth2 Bearer Token authentication.
@@ -27,9 +73,9 @@ class OAuth2Auth(Auth):
     automatic token refresh. It takes care of token management, including
     refreshing the token when it expires.
 
+    Works only with client_credentials grant type.
+
     Attributes:
-        client_id (str): The client ID for the OAuth2 application.
-        client_secret (str): The client secret for the OAuth2 application.
         token_url (str): The URL to obtain a new access token.
         scope (str): The scope of the access token.
         token (str): The OAuth2 bearer token.
