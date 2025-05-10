@@ -5,9 +5,11 @@ import httpx
 
 from ._applier import ApplierRegistry
 from ._definition import ParameterDefinition
+from ..logging_decorator import log_method_calls
 
 
 @dataclass
+@log_method_calls()
 class ParameterValue:
     definition: ParameterDefinition
     raw:        Any

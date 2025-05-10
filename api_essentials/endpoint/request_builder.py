@@ -5,8 +5,9 @@ from typing import Dict, Any, TYPE_CHECKING
 import httpx
 
 from api_essentials.auth import AbstractCredentials
-from api_essentials.auth.flow import AUTHORIZATION_HEADER_NAME
+from api_essentials.constants import AUTHORIZATION_HEADER_NAME
 from api_essentials.endpoint.definition import EndpointDefinition
+from api_essentials.flags import TRUST_UNDEFINED_PARAMETERS
 from api_essentials.logging_decorator import log_method_calls
 from api_essentials.parameter import applier_registry
 
@@ -52,13 +53,19 @@ class RequestBuilder:
                     f"{pd.name} is not configured for this endpoint."
                 )
 
-    def build(self, auth_info: AbstractCredentials, **data: Any) -> httpx.Request:
+    def build(self, *flags, auth_info: AbstractCredentials, **data: Any) -> httpx.Request:
+        logger.debug("Building request", extra={"data": data})
+
         self.validate_input(data)
         # Construct URL with path params
         new_path = f"{self.api.client.base_url.path.rstrip('/')}/{self.endpoint.path.lstrip('/')}"
-        url = self.api.client.base_url.copy_with(path=new_path)
-        req = httpx.Request(self.endpoint.method, url)
+        logger.debug(f"New path: {new_path}")
 
+        url = self.api.client.base_url.copy_with(path=new_path)
+        logger.debug(f"URL: {url}")
+
+        req = httpx.Request(self.endpoint.method, url)
+        logger.debug(f"Request method: {req.method}")
 
         # Apply each parameter
         if self.endpoint.parameters:
@@ -76,9 +83,25 @@ class RequestBuilder:
 
                     applier = applier_registry.get(pd.location)
                     req = applier.apply(req, pd, val)
-                    print(req.content)
 
                     logger.debug(f"Finished with parameter '{pd.name}' with value '{val}'")
+
+            if TRUST_UNDEFINED_PARAMETERS in flags:
+                current = json.loads(req.content.decode("utf-8")) if req.content else {}
+                for name, val in data.items():
+                    if name not in [p.name for p in self.endpoint.parameters]:
+                        logger.debug(f"Starting with parameter '{name}' with value '{val}'")
+                        if isinstance(current, dict):
+                            current[name] = str(val)
+                        else:
+                            raise ValueError(f"Cannot add parameter '{name}' to request with content type '{req.headers.get('Content-Type')}'")
+                req = httpx.Request(
+                    method=req.method,
+                    json=current,
+                    url=req.url,
+                    extensions=req.extensions,
+                    headers=req.headers
+                )
         else:
             req = httpx.Request(
                 method=req.method,
@@ -111,5 +134,8 @@ class RequestBuilder:
                 }
             }
         )
+        # Throw an exception if there was data sent but no content
+        if len(data) > 0 and not len(req.content):
+            raise ValueError(f"Request has no content but data was sent: {json.dumps(data)}")
 
         return req

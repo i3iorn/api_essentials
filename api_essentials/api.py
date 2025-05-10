@@ -1,4 +1,5 @@
 import inspect
+import logging
 from typing import List, Dict
 
 from .auth import AbstractCredentials
@@ -7,6 +8,7 @@ from .endpoint import Endpoint
 from .logging_decorator import log_method_calls
 from .response import Response
 
+logger = logging.getLogger(__name__)
 
 @log_method_calls()
 class BaseAPI:
@@ -17,6 +19,7 @@ class BaseAPI:
     def get_endpoint(self, name: str) -> Endpoint:
         """Return a list of API endpoints."""
         if name not in self._endpoints:
+            logger.error(f"Endpoint '{name}' not found in API. Available endpoints are: {list(self._endpoints.keys())}")
             raise KeyError(f"Endpoint '{name}' not found in API.")
         
         return self._endpoints[name]
@@ -32,7 +35,7 @@ class BaseAPI:
         
         self._endpoints = value
         
-    async def request(self, auth_info: AbstractCredentials, endpoint: Endpoint, **kwargs) -> Response:
+    async def request(self, *flags, auth_info: AbstractCredentials, endpoint: Endpoint, **kwargs) -> Response:
         """
         Make a request to the API.
 
@@ -40,11 +43,12 @@ class BaseAPI:
         :return: Response object
         """
         return await self.client.request(
-            endpoint.build_request(auth_info=auth_info, **kwargs)
+            endpoint.build_request(*flags, auth_info=auth_info, **kwargs)
         )
 
 
 
+@log_method_calls()
 class APIRegistry:
     """
     Registry for API classes.

@@ -9,6 +9,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 from api_essentials.logging_decorator import log_method_calls
 
 
+@log_method_calls()
 class Strategy(ABC):
     """
     Base class for strategies.
@@ -21,6 +22,7 @@ class Strategy(ABC):
         pass
 
 
+@log_method_calls()
 class StandardScopeStrategy(Strategy):
     """
     Standard scope strategy for OAuth2 authentication.
@@ -97,12 +99,14 @@ class NoRetries(RetryStrategy):
         super().__init__(retries=0, wait_multiplier=0, wait_max=0)
 
 
+@log_method_calls()
 class CoercionStrategy(Strategy, ABC):
     @abstractmethod
     def apply(self, raw: Any) -> Any:
         ...
 
 
+@log_method_calls()
 class SimpleCoercion(CoercionStrategy):
     def __init__(self, target: Type):
         self.target = target
@@ -116,6 +120,7 @@ class SimpleCoercion(CoercionStrategy):
             raise TypeError(f"Cannot coerce {raw!r} to {self.target.__name__}") from e
 
 
+@log_method_calls()
 class JSONCoercion(CoercionStrategy):
     def apply(self, raw: Any) -> Any:
         if isinstance(raw, str):

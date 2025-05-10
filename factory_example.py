@@ -6,6 +6,7 @@ import yaml
 
 from api_essentials.auth import OAuth2Auth, ClientCredentials
 from api_essentials.factory import APIFactory
+from api_essentials.flags import TRUST_UNDEFINED_PARAMETERS
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -13,9 +14,8 @@ logging.basicConfig(
 )
 
 async def main():
-    with open(r"C:\Users\micro\Downloads\swagger.yaml", "r", encoding="utf-8") as f:
+    with open(r"C:\Users\schrammelb\OneDrive - Dun and Bradstreet\Downloads\swagger.yaml", "r", encoding="utf-8") as f:
         openapi_spec = yaml.safe_load(f)
-
 
     my_api = APIFactory.from_openapi(openapi_spec, auth=OAuth2Auth(r"https://login.bisnode.com/sandbox/v1/token.oauth2"), verify=False)
 
@@ -28,6 +28,7 @@ async def main():
     endpoint = my_api.get_endpoint("/company/se")
 
     response = await my_api.request(
+        TRUST_UNDEFINED_PARAMETERS,
         auth_info=credentials,
         endpoint=endpoint,
         **{

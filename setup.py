@@ -2,8 +2,8 @@ from setuptools import setup, find_packages
 
 
 setup(
-    name="ApiEssentials",
-    version="0.1.0",
+    name="api-essentials",
+    version="0.2.0",
     author="Björn",
     author_email="bjorn@schrammel.dev",
     description="A Python package for API essentials.",

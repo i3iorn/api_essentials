@@ -1,66 +1,20 @@
 import base64
 import logging
-import typing
+import time
 from datetime import datetime, timedelta
 
 from typing import Mapping, Dict, Callable, Optional, List, AsyncGenerator
 
 import httpx
-from httpx import Auth, Request, Response, URL
+from httpx import Auth, Request, URL
 
+from api_essentials.constants import AUTHORIZATION_HEADER_NAME, GRACE_PERIOD, DEFAULT_TOKEN_NAME, \
+    DEFAULT_EXPIRATION_NAME
+from api_essentials.response import Response
+from api_essentials.auth.info import ClientCredentials
 from api_essentials.logging_decorator import log_method_calls
 from api_essentials.strategies import Strategy
 from api_essentials.utils import rebuild_request
-
-GRACE_PERIOD = 60  # seconds
-DEFAULT_TOKEN_NAME = "access_token"
-DEFAULT_EXPIRATION_NAME = "expires_in"
-AUTHORIZATION_HEADER_NAME = "Authorization"
-
-@log_method_calls()
-class TokenAuth(Auth):
-    """
-    Token authentication.
-
-    This class adds an Authorization header using the Bearer scheme.
-    It is used for APIs that require token authentication.
-
-    Attributes:
-        token (str): The token to be used for authentication.
-    """
-    def __init__(self, token: str, header_name: str = "API-KEY") -> None:
-        self.token = token
-        self.header_name = header_name
-
-    def async_auth_flow(
-        self, request: Request
-    ) -> AsyncGenerator[Request, Response]:
-        """
-        Asynchronous authentication flow.
-
-        Args:
-            request (Request): The HTTP request to be authenticated.
-
-        Yields:
-            Request: The authenticated request.
-        """
-        request.headers[self.header_name] = self.token
-        yield request
-
-    def sync_auth_flow(
-        self, request: Request
-    ) -> Response:
-        """
-        Synchronous authentication flow.
-
-        Args:
-            request (Request): The HTTP request to be authenticated.
-
-        Returns:
-            Response: The authenticated request.
-        """
-        request.headers[self.header_name] = self.token
-        return request
 
 
 @log_method_calls()
@@ -73,9 +27,9 @@ class OAuth2Auth(Auth):
     automatic token refresh. It takes care of token management, including
     refreshing the token when it expires.
 
-    Works only with client_credentials grant type.
-
     Attributes:
+        client_id (str): The client ID for the OAuth2 application.
+        client_secret (str): The client secret for the OAuth2 application.
         token_url (str): The URL to obtain a new access token.
         scope (str): The scope of the access token.
         token (str): The OAuth2 bearer token.
@@ -106,6 +60,8 @@ class OAuth2Auth(Auth):
         self.token: str | None              = None
         self.token_data: Dict | None        = None
         self.expires_at: datetime | None    = datetime.now()
+        self.token_request: httpx.Request | None  = None
+        self.token_response: Response | None = None
 
     def _validate_input(
             self,
@@ -120,6 +76,7 @@ class OAuth2Auth(Auth):
         Validates the input parameters for the OAuth2Auth class.
 
         Args:
+            auth_info (ClientCredentials): The client credentials.
             token_url (str): The URL to obtain a new access token.
             grant_type (str): The grant type for the OAuth2 flow.
             headers (List[Mapping[str, str]]): Additional headers for the request.
@@ -181,6 +138,8 @@ class OAuth2Auth(Auth):
         if self.has_expired():
             await self.refresh_token(request.extensions.get("auth_info"))
 
+        request.extensions["token_request"] = self.token_request
+        request.extensions["token_response"] = self.token_response
         request.headers[AUTHORIZATION_HEADER_NAME] = f"Bearer {self.token}"
         response = yield request
 
@@ -223,15 +182,18 @@ class OAuth2Auth(Auth):
                 timeout=kwargs.get("timeout", 10.0),
                 verify=kwargs.get("verify", True)
         ) as client:
-            print(
-                f"Token URL: {self.token_url}",
-                f"Data: {data}",
-                f"Headers: {headers}",
-                f"Request kwargs: {kwargs}",
-                sep="\n"
+            start = time.perf_counter()
+            request = client.build_request(
+                method="POST",
+                url=self.token_url,
+                data=data,
+                headers=headers,
+                params=kwargs.get("params")
             )
-            token_response = await client.post(self.token_url, data=data, headers=headers)
-            print(token_response.text)
+            end = time.perf_counter()
+            self.token_request = request
+            token_response = await client.send(request)
+            self.token_response = Response(token_response, end - start)
 
         if token_response.status_code != 200:
             logging.error(
