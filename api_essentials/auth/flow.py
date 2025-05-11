@@ -47,20 +47,6 @@ class TokenAuth(Auth):
         request.headers[self.header_name] = self.token
         yield request
 
-    def sync_auth_flow(
-        self, request: Request
-    ) -> Response:
-        """
-        Synchronous authentication flow.
-
-        Args:
-            request (Request): The HTTP request to be authenticated.
-
-        Returns:
-            Response: The authenticated request.
-        """
-        request.headers[self.header_name] = self.token
-        return request
 
 
 @log_method_calls()
