@@ -48,7 +48,9 @@ class ClientCredentials(AbstractCredentials):
         self._body = None
 
     def get_body(self) -> dict:
-        return self._body or {
+        if self._body is not None:
+            return self._body
+        return {
             "scope": self.get_scope(),
             "grant_type": "client_credentials"
         }
