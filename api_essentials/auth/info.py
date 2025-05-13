@@ -80,7 +80,7 @@ class ClientCredentials(AbstractCredentials):
         Get the scope as a string.
         """
         if not self.scopes:
-            raise ValueError("Scopes are not set.")
+            return []
         return self.scope_strategy.apply(self.scopes)
 
 
