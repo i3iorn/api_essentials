@@ -192,9 +192,18 @@ class OAuth2Auth(Auth):
 
         # Start with Basic auth header
         headers = {
-            AUTHORIZATION_HEADER_NAME: f"Basic {basic_token}",
             "Content-Type": "application/x-www-form-urlencoded",
         }
+        if auth_info.send_as == "header":
+            headers["Authorization"] = f"Basic {basic_token}"
+        elif auth_info.send_as == "body":
+            data.update(
+                {
+                    "client_id": auth_info.client_id,
+                    "client_secret": auth_info.client_secret
+                }
+            )
+
         headers.update(self.headers)
         headers.update(kwargs.pop("headers", {}))
 

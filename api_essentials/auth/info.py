@@ -32,6 +32,7 @@ class ClientCredentials(AbstractCredentials):
     client_id: str
     client_secret: str
     scopes: List[str]
+    send_as: str = "header"
     scope_strategy: Optional[Strategy] = StandardScopeStrategy()
 
     def __post_init__(self):
