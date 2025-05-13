@@ -50,7 +50,7 @@ class TokenAuth(Auth):
 
 
 @log_method_calls()
-class OAuth2Auth(Auth):
+class OAuth2Flow(Auth):
     """
     OAuth2 Bearer Token authentication.
 
@@ -103,7 +103,7 @@ class OAuth2Auth(Auth):
             scope_strategy: Optional[Strategy]
     ) -> None:
         """
-        Validates the input parameters for the OAuth2Auth class.
+        Validates the input parameters for the OAuth2Flow class.
 
         Args:
             token_url (str): The URL to obtain a new access token.
