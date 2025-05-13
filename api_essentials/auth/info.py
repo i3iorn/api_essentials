@@ -57,8 +57,8 @@ class ClientCredentials(AbstractCredentials):
         """
         Set the body of the credentials.
         """
-        if not isinstance(body, dict):
-            raise TypeError("Body must be a dictionary.")
+        if not isinstance(body, (dict, None)):
+            raise TypeError("Body must be a dictionary or None.")
         self._body = body
 
     def get_scope(self):
