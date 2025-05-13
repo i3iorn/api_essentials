@@ -83,7 +83,7 @@ class OAuth2Auth(Auth):
             scope_strategy=scope_strategy
         )
 
-        self.credential_encoding_strategy   = credential_encoding_strategy or CredentialEncodingStrategy
+        self.credential_encoding_strategy   = credential_encoding_strategy or CredentialEncodingStrategy()
         self.token_url                      = URL(token_url)
         self.headers                        = headers or []
         self.token_extractor                = token_extractor or self._default_token_extractor
