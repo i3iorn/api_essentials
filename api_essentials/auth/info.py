@@ -45,11 +45,21 @@ class ClientCredentials(AbstractCredentials):
         if self.scope_strategy and not isinstance(self.scope_strategy, Strategy):
             raise TypeError("Scope strategy must be an instance of Strategy.")
 
-    def get_body(self) -> dict:
-        return {
+        self._body = {
             "scope": self.get_scope(),
             "grant_type": "client_credentials"
         }
+
+    def get_body(self) -> dict:
+        return self._body
+
+    def set_body(self, body: Dict[str, str]):
+        """
+        Set the body of the credentials.
+        """
+        if not isinstance(body, dict):
+            raise TypeError("Body must be a dictionary.")
+        self._body = body
 
     def get_scope(self):
         """
