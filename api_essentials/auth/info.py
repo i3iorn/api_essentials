@@ -16,27 +16,11 @@ class AbstractCredentials(ABC):
         self._body = None
 
     @abstractmethod
-    def get_credentials(self) -> dict:
+    def get_body(self) -> dict:
         """
         Get credentials as a dictionary.
         """
         pass
-
-    @property
-    def body(self):
-        """
-        Get the body of the credentials.
-        """
-        return self._body or {}
-
-    @body.setter
-    def body(self, value):
-        """
-        Set the body of the credentials.
-        """
-        if not isinstance(value, dict):
-            raise TypeError("Body must be a dictionary.")
-        self._body = value
 
 
 @dataclass
@@ -48,7 +32,6 @@ class ClientCredentials(AbstractCredentials):
     client_id: str
     client_secret: str
     scopes: List[str]
-    body: Dict
     scope_strategy: Optional[Strategy] = StandardScopeStrategy()
 
     def __post_init__(self):
@@ -62,11 +45,10 @@ class ClientCredentials(AbstractCredentials):
         if self.scope_strategy and not isinstance(self.scope_strategy, Strategy):
             raise TypeError("Scope strategy must be an instance of Strategy.")
 
-    def get_credentials(self) -> dict:
+    def get_body(self) -> dict:
         return {
-            "client_id": self.client_id,
-            "client_secret": self.client_secret,
-            "scope": self.scope_strategy.apply(self.scopes)
+            "scope": self.get_scope(),
+            "grant_type": "client_credentials"
         }
 
     def get_scope(self):
@@ -93,11 +75,8 @@ class UserCredentials(AbstractCredentials):
         if not isinstance(self.username, str) or not isinstance(self.password, str):
             raise TypeError("Username and password must be strings.")
 
-    def get_credentials(self) -> dict:
-        return {
-            "username": self.username,
-            "password": self.password
-        }
+    def get_body(self) -> Optional[dict]:
+        return None
 
 
 @dataclass
@@ -115,11 +94,8 @@ class TokenCredentials(AbstractCredentials):
         if not isinstance(self.access_token, str) or not isinstance(self.refresh_token, str):
             raise TypeError("Access token and refresh token must be strings.")
 
-    def get_credentials(self) -> dict:
-        return {
-            "access_token": self.access_token,
-            "refresh_token": self.refresh_token
-        }
+    def get_body(self) -> Optional[dict]:
+        return None
 
 
 @dataclass
@@ -137,8 +113,5 @@ class ApiCredentials(AbstractCredentials):
         if not isinstance(self.api_key, str) or not isinstance(self.api_secret, str):
             raise TypeError("API key and secret must be strings.")
 
-    def get_credentials(self) -> dict:
-        return {
-            "api_key": self.api_key,
-            "api_secret": self.api_secret
-        }
+    def get_credentials(self) -> Optional[dict]:
+        return None
