@@ -10,6 +10,35 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 from api_essentials.logging_decorator import log_method_calls
 
 
+class CredentialEncodingStrategy(ABC):
+    @abstractmethod
+    def apply(self, client_id: str, client_secret: str) -> str:
+        pass
+
+class BasicAuthEncodingStrategy(CredentialEncodingStrategy):
+    def apply(self, client_id: str, client_secret: str) -> str:
+        token = f"{client_id}:{client_secret}"
+        return base64.b64encode(token.encode()).decode()
+
+class TokenExtractor(ABC):
+    @abstractmethod
+    def extract(self, data: dict) -> str:
+        pass
+
+class DefaultTokenExtractor(TokenExtractor):
+    def extract(self, data: dict) -> str:
+        return data.get("access_token")
+
+class ExpirationExtractor(ABC):
+    @abstractmethod
+    def extract(self, data: dict) -> int:
+        pass
+
+class DefaultExpirationExtractor(ExpirationExtractor):
+    def extract(self, data: dict) -> int:
+        return data.get("expires_in", 3600)
+
+
 @log_method_calls()
 class Strategy(ABC):
     """
