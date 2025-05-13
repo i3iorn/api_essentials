@@ -69,7 +69,6 @@ class OAuth2Auth(Auth):
     def __init__(
             self,
             token_url:                  str,
-            grant_type:                 str = None,
             headers:                    Mapping[str, str] = None,
             token_extractor:            Optional[Callable[[Dict], Optional[str]]] = None,
             token_expiration_extractor: Optional[Callable[[Dict], int]] = None,
@@ -77,7 +76,6 @@ class OAuth2Auth(Auth):
     ) -> None:
         self._validate_input(
             token_url=token_url,
-            grant_type=grant_type,
             headers=headers,
             token_extractor=token_extractor,
             token_expiration_extractor=token_expiration_extractor,
@@ -85,7 +83,6 @@ class OAuth2Auth(Auth):
         )
 
         self.token_url                      = URL(token_url)
-        self.grant_type                     = grant_type or "client_credentials"
         self.headers                        = headers or []
         self.token_extractor                = token_extractor or self._default_token_extractor
         self.token_expiration_extractor     = token_expiration_extractor or self._default_token_expiration_extractor
@@ -98,7 +95,6 @@ class OAuth2Auth(Auth):
     def _validate_input(
             self,
             token_url: str,
-            grant_type: str,
             headers: Mapping[str, str],
             token_extractor: Optional[Callable[[Dict], Optional[str]]],
             token_expiration_extractor: Optional[Callable[[Dict], int]],
@@ -121,8 +117,6 @@ class OAuth2Auth(Auth):
         """
         if not isinstance(token_url, str):
             raise TypeError("token_url must be a string.")
-        if grant_type and not isinstance(grant_type, str):
-            raise TypeError("grant_type must be a string.")
         if headers and not isinstance(headers, list):
             raise TypeError("headers must be a list of dictionaries.")
         if token_extractor and token_extractor and not callable(token_extractor):
@@ -196,7 +190,7 @@ class OAuth2Auth(Auth):
         auth_str = f"{auth_info.client_id}:{auth_info.client_secret}"
         basic_token = base64.b64encode(auth_str.encode()).decode()
 
-        data = {"grant_type": self.grant_type, "scope": auth_info.get_scope()}
+        data = auth_info.body
         data.update(kwargs.pop("data", {}))
 
         # Start with Basic auth header

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from api_essentials.logging_decorator import log_method_calls
 from api_essentials.strategies import Strategy, StandardScopeStrategy
@@ -18,6 +18,13 @@ class AbstractCredentials(ABC):
         """
         pass
 
+    @property
+    def body(self):
+        """
+        Get the body of the credentials.
+        """
+        return {}
+
 
 @dataclass
 @log_method_calls()
@@ -28,6 +35,7 @@ class ClientCredentials(AbstractCredentials):
     client_id: str
     client_secret: str
     scopes: List[str]
+    body: Dict
     scope_strategy: Optional[Strategy] = StandardScopeStrategy()
 
     def __post_init__(self):
