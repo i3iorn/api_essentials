@@ -11,6 +11,10 @@ class AbstractCredentials(ABC):
     """
     Abstract class for credentials.
     """
+
+    def __init__(self):
+        self._body = None
+
     @abstractmethod
     def get_credentials(self) -> dict:
         """
@@ -23,7 +27,16 @@ class AbstractCredentials(ABC):
         """
         Get the body of the credentials.
         """
-        return {}
+        return self._body or {}
+    
+    @body.setter
+    def body(self, value):
+        """
+        Set the body of the credentials.
+        """
+        if not isinstance(value, dict):
+            raise TypeError("Body must be a dictionary.")
+        self._body = value
 
 
 @dataclass
