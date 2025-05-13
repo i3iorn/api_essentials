@@ -60,7 +60,7 @@ class ClientCredentials(AbstractCredentials):
         self._body = None
 
     def get_body(self) -> dict:
-        return self._body
+        return self._body or {}
 
     def set_body(self, body: Dict[str, str]):
         """
