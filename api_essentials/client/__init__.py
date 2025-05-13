@@ -25,6 +25,7 @@ class APIClient:
         base_url:       URL,
         auth:           httpx.Auth,
         timeout:        float                               = 10.0,
+        async_client:   httpx.AsyncClient                   = None,
         headers:        Optional[Dict[str, str]]            = None,
         response_hooks: Optional[Dict[str, List[Callable]]] = None,
         request_hooks:  Optional[Dict[str, List[Callable]]] = None,
@@ -45,6 +46,13 @@ class APIClient:
         self._retry_strategy = retry_strategy or NoRetries()
         self._user_agent     = user_agent or "Generic APIClient/1.0"
 
+        headers = headers or {}
+        headers["User-Agent"] = self._user_agent
+        headers["Accept"]     = "application/json"
+        headers["Content-Type"] = "application/json"
+        headers["Accept-Encoding"] = "gzip, deflate, br"
+        headers.update(kwargs.pop("headers", {}))
+
         # Setup event hooks
         response_hooks = response_hooks or []
         request_hooks = request_hooks or []
@@ -57,7 +65,17 @@ class APIClient:
             "request": request_hooks,
         }
 
-        self.client = httpx.AsyncClient(
+        self.client = httpx.Client(
+            auth=self._auth,
+            base_url=self._base_url,
+            timeout=self._timeout,
+            verify=self._verify,
+            headers=headers,
+            event_hooks=event_hooks,
+            **kwargs
+        )
+
+        self.aclient = async_client or httpx.AsyncClient(
             auth=self._auth,
             base_url=self._base_url,
             timeout=self._timeout,
@@ -88,7 +106,27 @@ class APIClient:
             host=f"{host_prefix}{self.base_url.host}"
         )
 
-    async def request(self, request: httpx.Request, **kwargs) -> Response:
+    def request(self, method: str, url: str, **kwargs) -> Response:
+        """
+        Make a request using the HTTPX client.
+        """
+        self.logger.debug(
+            "Making request",
+            extra={
+                "payload": {
+                    "method": method,
+                    "path": url,
+                    "options": kwargs,
+                }
+            }
+        )
+
+        start = time.perf_counter()
+        response = self.client.request(method, url, **kwargs)
+        end = time.perf_counter()
+        return Response(response, end - start)
+
+    async def arequest(self, request: httpx.Request, **kwargs) -> Response:
         """
         Make a request using the HTTPX client.
         """
@@ -105,7 +143,7 @@ class APIClient:
         )
 
         async def make_request():
-            return await self.client.send(request)
+            return await self.aclient.send(request)
 
         wrapped = self._retry_strategy.apply(make_request)
         start = time.perf_counter()
@@ -115,7 +153,7 @@ class APIClient:
 
     async def close(self) -> None:
         """Close the internal connection pool."""
-        await self.client.aclose()
+        await self.aclient.aclose()
 
     @classmethod
     def from_openapi(
