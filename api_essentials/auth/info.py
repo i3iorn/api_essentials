@@ -23,19 +23,28 @@ class AbstractCredentials(ABC):
         pass
 
 
-@dataclass
 @log_method_calls()
 class ClientCredentials(AbstractCredentials):
     """
     Class for client credentials.
     """
-    client_id: str
-    client_secret: str
-    scopes: List[str]
-    send_as: str = "header"
-    scope_strategy: Optional[Strategy] = StandardScopeStrategy()
-    associatedServer: Optional[str] = None
-    headers: Optional[Dict[str, str]] = None
+    def __init__(self,
+            client_id: str,
+            client_secret: str,
+            scopes: List[str],
+            send_as: str = "header",
+            scope_strategy: Optional[Strategy] = StandardScopeStrategy(),
+            headers: Optional[Dict[str, str]] = None,
+            **kwargs
+        ):
+            super().__init__()
+            self._body = None
+            self.client_id = client_id
+            self.client_secret = client_secret
+            self.scopes = scopes
+            self.send_as = send_as
+            self.scope_strategy = scope_strategy
+            self.headers = headers if headers is not None else {}
 
     def __post_init__(self):
         if not self.client_id or not self.client_secret:
