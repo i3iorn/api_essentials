@@ -29,7 +29,7 @@ class ClientCredentials(AbstractCredentials):
     Class for client credentials.
     """
     def __init__(self,
-            clientId: str,
+            client_id: str,
             client_secret: str,
             scopes: List[str] = None,
             send_as: str = "header",
@@ -39,7 +39,7 @@ class ClientCredentials(AbstractCredentials):
         ):
             super().__init__()
             self._body = None
-            self.client_id = clientId
+            self.client_id = client_id
             self.client_secret = client_secret
             self.scopes = scopes
             self.send_as = send_as

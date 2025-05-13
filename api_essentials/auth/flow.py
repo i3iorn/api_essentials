@@ -1,9 +1,10 @@
+import asyncio
 import base64
 import logging
 import time
 from datetime import datetime, timedelta
 
-from typing import Mapping, Dict, Callable, Optional, List, AsyncGenerator
+from typing import Mapping, Dict, Callable, Optional, List, AsyncGenerator, Any
 
 import httpx
 from httpx import Auth, Request, URL
@@ -16,6 +17,7 @@ from api_essentials.logging_decorator import log_method_calls
 from api_essentials.strategies import Strategy, CredentialEncodingStrategy
 from api_essentials.utils import rebuild_request
 
+logger = logging.getLogger(__name__)
 
 @log_method_calls()
 class TokenFlow(Auth):
@@ -93,6 +95,7 @@ class OAuth2Flow(Auth):
         self.expires_at: datetime | None    = datetime.now()
         self.token_request: httpx.Request | None  = None
         self.token_response: Response | None = None
+        self._lock: asyncio.Lock            = asyncio.Lock()
 
     def _validate_input(
             self,
@@ -115,22 +118,17 @@ class OAuth2Flow(Auth):
             TypeError: If any of the input parameters are of the wrong type.
             ValueError: If any of the input parameters are invalid.
         """
+        URL(token_url)
         if not isinstance(token_url, str):
             raise TypeError("token_url must be a string.")
-        if headers and not isinstance(headers, dict):
-            raise TypeError("headers must be a list of dictionaries.")
+        if headers and not isinstance(headers, list):
+            raise TypeError("headers must be a list")
         if token_extractor and token_extractor and not callable(token_extractor):
             raise TypeError("token_extractor must be a callable function.")
         if token_expiration_extractor and token_expiration_extractor and not callable(token_expiration_extractor):
             raise TypeError("token_expiration_extractor must be a callable function.")
-        if headers and not all("name" in header and "value" in header for header in headers):
-            raise ValueError("Each header dictionary must contain 'name' and 'value' keys.")
-        if headers and not all(header["name"] and header["value"] for header in headers):
-            raise ValueError("Header names and values must be non-empty strings.")
         if scope_strategy is not None and not isinstance(scope_strategy, Strategy):
             raise TypeError("scope_strategy must be an instance of Strategy.")
-
-        URL(token_url)
 
     def _default_token_extractor(self, response: Dict[str, str]) -> Optional[str]:
         """
@@ -182,67 +180,83 @@ class OAuth2Flow(Auth):
         """
         return self.expires_at < datetime.now() or self.token is None
 
-    async def refresh_token(self, auth_info, **kwargs) -> None:
-        self._verify_request_kwargs(kwargs)
+    async def refresh_token(self, auth_info: ClientCredentials, **kwargs: Any) -> None:
+        async with self._lock:
+            if self.has_expired():
+                self._verify_request_kwargs(kwargs)
+                request_parameters: Dict = {"method": "POST", "url": self.token_url}
+                logger.debug(f"Refreshing token for {auth_info.client_id}", extra={"payload": None})
 
-        basic_token = self.credential_encoding_strategy.apply(auth_info.client_id, auth_info.client_secret)
+                data = auth_info.get_body()
+                data.update(kwargs.pop("data", {}))
+                logger.debug(f"Token request data: {data}", extra={"payload": None})
 
-        data = auth_info.get_body()
-        data.update(kwargs.pop("data", {}))
-
-        # Start with Basic auth header
-        headers = {
-            "Content-Type": "application/x-www-form-urlencoded",
-        }
-        if auth_info.send_as == "header":
-            headers["Authorization"] = f"Basic {basic_token}"
-        elif auth_info.send_as == "body":
-            data.update(
-                {
-                    "client_id": auth_info.client_id,
-                    "client_secret": auth_info.client_secret
+                # Start with Basic auth header
+                headers = {
+                    "Content-Type": "application/x-www-form-urlencoded",
                 }
-            )
+                logger.debug(f"Token request headers: {headers}", extra={"payload": None})
 
-        headers.update(self.headers)
-        headers.update(kwargs.pop("headers", {}))
-        headers.update(auth_info.headers)
+                headers.update(self.headers)
+                headers.update(kwargs.pop("headers", {}))
+                headers.update(auth_info.headers)
+                logger.debug(f"Token request headers: {headers}", extra={"payload": None})
 
-        async with httpx.AsyncClient(
-                timeout=kwargs.get("timeout", 10.0),
-                verify=kwargs.get("verify", True)
-        ) as client:
-            start = time.perf_counter()
-            request = client.build_request(
-                method="POST",
-                url=self.token_url,
-                data=data,
-                headers=headers,
-                params=kwargs.get("params")
-            )
-            end = time.perf_counter()
-            self.token_request = request
-            token_response = await client.send(request)
-            self.token_response = Response(token_response, end - start)
+                if auth_info.send_as == "header":
+                    basic_token = self.credential_encoding_strategy.apply(auth_info.client_id, auth_info.client_secret)
+                    headers["Authorization"] = f"Basic {basic_token}"
+                elif auth_info.send_as == "body":
+                    data.update(
+                        {
+                            "client_id": auth_info.client_id,
+                            "client_secret": auth_info.client_secret
+                        }
+                    )
+                logger.debug(f"Token request data: {data}", extra={"payload": None})
 
-        if token_response.status_code != 200:
-            logging.error(
-                f"Token request failed: {token_response.status_code} {token_response.text}"
-            )
-            raise ValueError(f"Failed to obtain token: {token_response.text}. \nBody was {token_response.request.content} \nHeaders were {token_response.request.headers}")
+                request_parameters["headers"] = headers
 
-        token_data = token_response.json()
-        # store raw payload
-        self.token_data = token_data
-        # extract token & expiration
-        self.token = self.token_extractor(token_data)
-        expires = self.token_expiration_extractor(token_data)
-        # if expiration is a delta, unify here:
-        if isinstance(expires, (int, float)):
-            expires = datetime.now() + timedelta(seconds=expires)
-        self.expires_at = expires - timedelta(seconds=GRACE_PERIOD)
+                if headers["Content-Type"] == "application/json":
+                    request_parameters["json"] = data
+                elif headers["Content-Type"] == "multipart/form-data":
+                    request_parameters["files"] = data
+                else:
+                    request_parameters["data"] = data
+                logger.debug(f"Token request parameters: {request_parameters}", extra={"payload": None})
 
-        logging.debug("refresh_token() completed", extra={"payload": None})
+                async with httpx.AsyncClient(
+                        timeout=kwargs.get("timeout", 10.0),
+                        verify=kwargs.get("verify", True)
+                ) as client:
+                    start = time.perf_counter()
+                    request = client.build_request(**request_parameters)
+
+                    end = time.perf_counter()
+                    self.token_request = request
+                    token_response = await client.send(request)
+                    self.token_response = Response(token_response, end - start)
+                    logger.debug(f"Token response was {token_response.status_code} - {token_response.text}", extra={"payload": None})
+
+                logger.debug(f"Token request took {end - start:.2f} seconds", extra={"payload": None})
+
+                if token_response.status_code != 200:
+                    logging.error(
+                        f"Token request failed: {token_response.status_code} {token_response.text}"
+                    )
+                    raise ValueError(f"Failed to obtain token: {token_response.text}. \nBody was {token_response.request.content} \nHeaders were {token_response.request.headers}")
+
+                token_data = token_response.json()
+                # store raw payload
+                self.token_data = token_data
+                # extract token & expiration
+                self.token = self.token_extractor(token_data)
+                expires = self.token_expiration_extractor(token_data)
+                # if expiration is a delta, unify here:
+                if isinstance(expires, (int, float)):
+                    expires = datetime.now() + timedelta(seconds=expires)
+                self.expires_at = expires - timedelta(seconds=GRACE_PERIOD)
+
+                logging.debug(f"Token expires at {self.expires_at} ({self.expires_at - datetime.now()}). \nToken was {self.token}")
 
     def _verify_request_kwargs(self, kwargs):
         """
