@@ -34,6 +34,8 @@ class ClientCredentials(AbstractCredentials):
     scopes: List[str]
     send_as: str = "header"
     scope_strategy: Optional[Strategy] = StandardScopeStrategy()
+    associatedServer: Optional[str] = None
+    headers: Optional[Dict[str, str]] = None
 
     def __post_init__(self):
         if not self.client_id or not self.client_secret:
