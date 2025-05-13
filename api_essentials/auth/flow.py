@@ -117,14 +117,12 @@ class OAuth2Auth(Auth):
         """
         if not isinstance(token_url, str):
             raise TypeError("token_url must be a string.")
-        if headers and not isinstance(headers, list):
+        if headers and not isinstance(headers, dict):
             raise TypeError("headers must be a list of dictionaries.")
         if token_extractor and token_extractor and not callable(token_extractor):
             raise TypeError("token_extractor must be a callable function.")
         if token_expiration_extractor and token_expiration_extractor and not callable(token_expiration_extractor):
             raise TypeError("token_expiration_extractor must be a callable function.")
-        if headers and not all(isinstance(header, dict) for header in headers):
-            raise TypeError("All headers must be dictionaries.")
         if headers and not all("name" in header and "value" in header for header in headers):
             raise ValueError("Each header dictionary must contain 'name' and 'value' keys.")
         if headers and not all(header["name"] and header["value"] for header in headers):
@@ -198,10 +196,7 @@ class OAuth2Auth(Auth):
             AUTHORIZATION_HEADER_NAME: f"Basic {basic_token}",
             "Content-Type": "application/x-www-form-urlencoded",
         }
-        # Merge in any extra headers (our list of dicts)
-        for hdr in self.headers:
-            headers[hdr["name"]] = hdr["value"]
-        # Finally allow overrides via kwargs
+        headers.update(self.headers)
         headers.update(kwargs.pop("headers", {}))
 
         async with httpx.AsyncClient(

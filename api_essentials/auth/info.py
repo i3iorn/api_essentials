@@ -28,7 +28,7 @@ class AbstractCredentials(ABC):
         Get the body of the credentials.
         """
         return self._body or {}
-    
+
     @body.setter
     def body(self, value):
         """
