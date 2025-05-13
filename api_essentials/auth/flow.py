@@ -206,7 +206,7 @@ class OAuth2Auth(Auth):
 
         headers.update(self.headers)
         headers.update(kwargs.pop("headers", {}))
-        headers.update(auth_info.geat("headers"))
+        headers.update(auth_info.get("headers"))
 
         async with httpx.AsyncClient(
                 timeout=kwargs.get("timeout", 10.0),
