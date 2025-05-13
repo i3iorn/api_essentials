@@ -33,6 +33,9 @@ class OAuth2FlowBase(Auth, ABC):
         self.token: Optional[str] = None
         self.expires_at: Optional[datetime] = None
         self.token_data: Optional[dict] = None
+        self._refresh_lock: asyncio.Lock = asyncio.Lock()
+        self.token_request: Optional[Request] = None
+        self.token_response: Optional[Response] = None
 
     def has_expired(self) -> bool:
         return not self.token or not self.expires_at or self.expires_at <= datetime.now()
@@ -52,7 +55,7 @@ class OAuth2FlowBase(Auth, ABC):
 
     def auth_flow(self, request: Request) -> typing.Generator[Request, Response, None]:
         if self.has_expired():
-            self.refresh_token(request.extensions.get("auth_info"))
+            asyncio.run(self.refresh_token(request.extensions.get("auth_info")))
 
         request.headers["Authorization"] = f"Bearer {self.token}"
         response = yield request
@@ -64,11 +67,14 @@ class OAuth2FlowBase(Auth, ABC):
             yield request
 
     async def refresh_token(self, auth_info, **kwargs):
-        token_data = await self.fetch_token(auth_info, **kwargs)
-        self.token = self.token_extractor.extract(token_data)
-        expires_in = self.expiration_extractor.extract(token_data)
-        self.expires_at = datetime.now() + timedelta(seconds=expires_in - GRACE_PERIOD)
-        self.token_data = token_data
+        async with self._refresh_lock:
+            if not self.has_expired():
+                return
+            token_data = await self.fetch_token(auth_info, **kwargs)
+            self.token = self.token_extractor.extract(token_data)
+            expires_in = self.expiration_extractor.extract(token_data)
+            self.expires_at = datetime.now() + timedelta(seconds=expires_in - GRACE_PERIOD)
+            self.token_data = token_data
 
     @abstractmethod
     async def fetch_token(self, auth_info, **kwargs) -> Dict:

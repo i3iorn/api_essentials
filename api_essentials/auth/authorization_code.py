@@ -1,4 +1,5 @@
 from api_essentials.auth.oauth_base import OAuth2FlowBase
+import secrets, hashlib, base64
 import httpx
 
 class AuthorizationCodeOAuth2Flow(OAuth2FlowBase):
@@ -7,10 +8,17 @@ class AuthorizationCodeOAuth2Flow(OAuth2FlowBase):
         self.redirect_uri = redirect_uri
 
     async def fetch_token(self, auth_info, **kwargs) -> dict:
+        code_verifier = secrets.token_urlsafe(64)
+        digest = hashlib.sha256(code_verifier.encode()).digest()
+        code_challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
+
         data = {
             "grant_type": "authorization_code",
             "code": auth_info.code,
             "redirect_uri": self.redirect_uri,
+            "code_verifier": code_verifier,
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
             **(kwargs.pop("data", {}))
         }
 
