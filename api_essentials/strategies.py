@@ -1,3 +1,4 @@
+import base64
 import json
 import logging
 from abc import abstractmethod, ABC
@@ -20,6 +21,24 @@ class Strategy(ABC):
         Apply the strategy.
         """
         pass
+
+
+@log_method_calls()
+class CredentialEncodingStrategy(Strategy):
+    """
+    Strategy for encoding credentials.
+    """
+    def apply(self, client_id: str, client_secret: str) -> str:
+        """
+        Apply the encoding strategy.
+        """
+        if not client_id or not client_secret:
+            raise ValueError("Client ID and Client Secret must be provided.")
+        if not isinstance(client_id, str) or not isinstance(client_secret, str):
+            raise TypeError("Client ID and Client Secret must be strings.")
+
+        auth_str = f"{client_id}:{client_secret}"
+        return base64.b64encode(auth_str.encode()).decode()
 
 
 @log_method_calls()

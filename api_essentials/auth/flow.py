@@ -13,7 +13,7 @@ from api_essentials.constants import AUTHORIZATION_HEADER_NAME, GRACE_PERIOD, DE
 from api_essentials.response import Response
 from api_essentials.auth.info import ClientCredentials
 from api_essentials.logging_decorator import log_method_calls
-from api_essentials.strategies import Strategy
+from api_essentials.strategies import Strategy, CredentialEncodingStrategy
 from api_essentials.utils import rebuild_request
 
 
@@ -72,7 +72,8 @@ class OAuth2Auth(Auth):
             headers:                    Mapping[str, str] = None,
             token_extractor:            Optional[Callable[[Dict], Optional[str]]] = None,
             token_expiration_extractor: Optional[Callable[[Dict], int]] = None,
-            scope_strategy:             Optional[Strategy] = None
+            scope_strategy:             Optional[Strategy] = None,
+            credential_encoding_strategy: Optional[Strategy] = None,
     ) -> None:
         self._validate_input(
             token_url=token_url,
@@ -82,6 +83,7 @@ class OAuth2Auth(Auth):
             scope_strategy=scope_strategy
         )
 
+        self.credential_encoding_strategy   = credential_encoding_strategy or CredentialEncodingStrategy
         self.token_url                      = URL(token_url)
         self.headers                        = headers or []
         self.token_extractor                = token_extractor or self._default_token_extractor
@@ -104,9 +106,7 @@ class OAuth2Auth(Auth):
         Validates the input parameters for the OAuth2Auth class.
 
         Args:
-            auth_info (ClientCredentials): The client credentials.
             token_url (str): The URL to obtain a new access token.
-            grant_type (str): The grant type for the OAuth2 flow.
             headers (List[Mapping[str, str]]): Additional headers for the request.
             token_extractor (Optional[Callable[[Dict], Optional[str]]]): Function to extract the token from the response.
             token_expiration_extractor (Optional[Callable[[Dict], int]]): Function to extract the expiration time from the response.
@@ -185,10 +185,9 @@ class OAuth2Auth(Auth):
     async def refresh_token(self, auth_info, **kwargs) -> None:
         self._verify_request_kwargs(kwargs)
 
-        auth_str = f"{auth_info.client_id}:{auth_info.client_secret}"
-        basic_token = base64.b64encode(auth_str.encode()).decode()
+        basic_token = self.credential_encoding_strategy.apply(auth_info.client_id, auth_info.client_secret)
 
-        data = auth_info.body
+        data = auth_info.get_body()
         data.update(kwargs.pop("data", {}))
 
         # Start with Basic auth header
