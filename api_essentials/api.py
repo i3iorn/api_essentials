@@ -1,10 +1,12 @@
 import inspect
 import logging
-from typing import List, Dict
+from typing import List, Dict, Any
+from difflib import get_close_matches
 
 from .auth import AbstractCredentials
 from .client import APIClient
 from .endpoint import Endpoint
+from .flags import Flag
 from .logging_decorator import log_method_calls
 from .response import Response
 
@@ -19,8 +21,13 @@ class BaseAPI:
     def get_endpoint(self, name: str) -> Endpoint:
         """Return a list of API endpoints."""
         if name not in self._endpoints:
-            logger.error(f"Endpoint '{name}' not found in API. Available endpoints are: {list(self._endpoints.keys())}")
-            raise KeyError(f"Endpoint '{name}' not found in API.")
+            close_endpoint = get_close_matches(name, self._endpoints.keys(), n=1, cutoff=0.6)
+            if close_endpoint:
+                msg = f"Endpoint '{name}' not found. Did you mean '{close_endpoint[0]}'?"
+            else:
+                msg = f"Endpoint '{name}' not found. Available endpoints: {', '.join(self._endpoints.keys())}"
+            logger.warning(msg)
+            raise ValueError(msg)
         
         return self._endpoints[name]
 
@@ -35,14 +42,29 @@ class BaseAPI:
         
         self._endpoints = value
         
-    async def request(self, *flags, auth_info: AbstractCredentials, endpoint: Endpoint, **kwargs) -> Response:
+    async def request(
+            self,
+            *flags: Flag,
+            auth_info: AbstractCredentials,
+            endpoint: Endpoint,
+            **kwargs: Any
+    ) -> Response:
         """
         Make a request to the API.
 
-        :param kwargs: Additional request parameters
-        :return: Response object
+        Arguments:
+            flags: Flags to be passed to the request.
+            auth_info: Authentication information.
+            endpoint: The endpoint to make the request to.
+            **kwargs: Additional keyword arguments for the request.
+
+        Returns:
+            Response: The response from the API.
+
+        Raises:
+            ValueError: If the endpoint is not found.
         """
-        return await self.client.request(
+        return await self.client.arequest(
             endpoint.build_request(*flags, auth_info=auth_info, **kwargs)
         )
 
