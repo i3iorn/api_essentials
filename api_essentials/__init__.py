@@ -1,5 +1,5 @@
 from api_essentials.factory import APIFactory
-from api_essentials.auth import OAuth2Auth, TokenAuth, ClientCredentials, UserCredentials, TokenCredentials, ApiCredentials
+from api_essentials.auth import OAuth2Flow, TokenFlow, ClientCredentials, UserCredentials, TokenCredentials, ApiCredentials
 from api_essentials.client import APIClient
 from api_essentials.endpoint import Endpoint
 from api_essentials.parameter import ParameterFactoryService as ParameterFactory
@@ -13,8 +13,8 @@ from api_essentials.flags import (
 
 
 __all__ = [
-    "OAuth2Auth",
-    "TokenAuth",
+    "OAuth2Flow",
+    "TokenFlow",
 
     "ClientCredentials",
     "UserCredentials",

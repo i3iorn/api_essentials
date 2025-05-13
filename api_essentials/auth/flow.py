@@ -18,7 +18,7 @@ from api_essentials.utils import rebuild_request
 
 
 @log_method_calls()
-class TokenAuth(Auth):
+class TokenFlow(Auth):
     """
     Token authentication.
 
