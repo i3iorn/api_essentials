@@ -1,0 +1,7 @@
+[tool.poetry]
+name = "api-essentials"
+version = "0.1.0"
+description = "A collection of essentials for various API functionalities."
+
+[tool.poetry.dependencies]
+httpx = "^0.24"
