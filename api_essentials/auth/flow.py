@@ -1,5 +1,4 @@
 import asyncio
-import base64
 import logging
 import time
 from datetime import datetime, timedelta
@@ -13,7 +12,6 @@ from api_essentials.constants import AUTHORIZATION_HEADER_NAME, GRACE_PERIOD, DE
     DEFAULT_EXPIRATION_NAME
 from api_essentials.response import Response
 from api_essentials.auth.info import ClientCredentials
-from api_essentials.logging_decorator import log_method_calls
 from api_essentials.strategies import Strategy, CredentialEncodingStrategy
 from api_essentials.utils import rebuild_request
 
