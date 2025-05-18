@@ -4,7 +4,7 @@ import logging
 import time
 from datetime import datetime, timedelta
 
-from typing import Mapping, Dict, Callable, Optional, List, AsyncGenerator, Any
+from typing import Mapping, Dict, Callable, Optional, List, AsyncGenerator, Any, Generator
 
 import httpx
 from httpx import Auth, Request, URL
@@ -19,7 +19,7 @@ from api_essentials.utils import rebuild_request
 
 logger = logging.getLogger(__name__)
 
-@log_method_calls()
+
 class TokenFlow(Auth):
     """
     Token authentication.
@@ -51,7 +51,6 @@ class TokenFlow(Auth):
 
 
 
-@log_method_calls()
 class OAuth2Flow(Auth):
     """
     OAuth2 Bearer Token authentication.
@@ -153,6 +152,46 @@ class OAuth2Flow(Auth):
             int: The expiration time in seconds.
         """
         return datetime.now() + timedelta(seconds=response.get(DEFAULT_EXPIRATION_NAME, 0))
+
+    def auth_flow(self, request: Request) -> Generator[Request, Response, None]:
+        """
+        Sync auth flow: called by httpx.Client.
+        """
+        token = self._get_token()
+        request.headers["Authorization"] = f"Bearer {token}"
+        response = yield request
+        if response.status_code == 401:
+            # refresh once on 401
+            self._fetch_token()
+            request.headers["Authorization"] = f"Bearer {self._get_token()}"
+            yield request
+
+    def _get_token(self) -> str:
+        """
+        Get the token.
+
+        Returns:
+            str: The access token.
+        """
+        if self.has_expired():
+            raise ValueError("Token has expired.")
+        return self.token
+
+    def _fetch_token(self) -> None:
+        """
+        Fetch the token from the token URL.
+        """
+        if self.has_expired():
+            raise ValueError("Token has expired.")
+        if self.token_request is None:
+            raise ValueError("Token request is not set.")
+        if self.token_response is None:
+            raise ValueError("Token response is not set.")
+
+        # Set the token in the request
+        self.token = self.token_response.json().get(DEFAULT_TOKEN_NAME, None)
+        if self.token is None:
+            raise ValueError("Token not found in response.")
 
     async def async_auth_flow(
         self, request: Request
