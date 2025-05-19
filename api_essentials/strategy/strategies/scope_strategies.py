@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, Union
 
-from strategy.interface import SimpleStrategy
+from api_essentials.strategy.interface import SimpleStrategy
 
 
 class ScopeStrategyError(Exception):...

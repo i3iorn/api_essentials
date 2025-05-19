@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import List, Protocol
+from typing import List
 
-from strategy.interface import Strategy
+from api_essentials.strategy.interface import Strategy
 
 
 class RateLimitStrategyProtocol(Strategy):

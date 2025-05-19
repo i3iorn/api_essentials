@@ -5,10 +5,10 @@ from typing import Optional, List, Union, TYPE_CHECKING, Type
 import httpx
 from httpx import URL, AsyncClient, Client
 
-from auth.token import OAuth2Token
-from auth.grant_type import OAuth2GrantType
-from auth.oauth2 import OAuth2ResponseType, ClientType
-from strategy.strategies.scope_strategies import ScopeStrategy, ScopeExecutionMode
+from api_essentials.strategy.strategies.scope_strategies import ScopeStrategy, ScopeExecutionMode
+from api_essentials.auth.token import OAuth2Token
+from .grant_type import OAuth2GrantType
+from .oauth2 import OAuth2ResponseType, ClientType
 
 
 class ConfigValidator:

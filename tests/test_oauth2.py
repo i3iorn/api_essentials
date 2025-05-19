@@ -4,11 +4,11 @@ from datetime import datetime, timedelta
 from httpx import URL, Client, AsyncClient, Request, Response
 
 import httpx
-from auth.config import OAuth2Config, ConfigValidator
-from auth.oauth2 import BaseOAuth2, OAuth2ResponseType
-from auth.token import OAuth2Token, OAuthTokenType
-from auth.grant_type import OAuth2GrantType
-from utils.log import register_secret, SecretFilter
+from api_essentials.auth.config import OAuth2Config, ConfigValidator
+from api_essentials.auth import BaseOAuth2, OAuth2ResponseType
+from api_essentials.auth import OAuth2Token, OAuthTokenType
+from api_essentials.auth import OAuth2GrantType
+from api_essentials.utils import register_secret, SecretFilter
 
 
 # -- Fixtures & Helpers ------------------------------------------------------
@@ -86,7 +86,7 @@ def expired_token(token_data):
         access_token=token_data["access_token"],
         refresh_token=token_data["refresh_token"],
         expires_in=1,
-        created_at=datetime.now() - timedelta(seconds=10),
+        created_at=datetime.now() - timedelta(seconds=60),
     )
 
 @pytest.fixture
@@ -144,7 +144,7 @@ class TestOAuth2ConfigProperties:
         assert basic_config.response_type == "token"
 
     def test_scope_strategy_setter(self, basic_config):
-        from strategy.strategies.scope_strategies import ScopeStrategy
+        from api_essentials.strategy.strategies import ScopeStrategy
         strategy = ScopeStrategy(delimiter=",")
         basic_config.scope_strategy = strategy
         assert basic_config._scope_strategy.delimiter == ","

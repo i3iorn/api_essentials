@@ -3,8 +3,8 @@ import logging
 import httpx
 from httpx import URL
 
-from auth.config import OAuth2Config
-from auth.oauth2 import BaseOAuth2
+from api_essentials.auth.config import OAuth2Config
+from api_essentials.auth.oauth2 import BaseOAuth2
 
 logging.basicConfig(
     level=logging.DEBUG,

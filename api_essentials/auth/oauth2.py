@@ -7,12 +7,11 @@ import httpx
 from httpx import Auth, Request, Response
 from enum import Enum
 
-from auth.grant_type import OAuth2GrantType
-from auth.token import OAuth2Token
-from utils.log import register_secret, setup_secret_filter
+from api_essentials.utils.log import register_secret, setup_secret_filter
+from .token import OAuth2Token
 
 if TYPE_CHECKING:
-    from auth.config import OAuth2Config
+    from .config import OAuth2Config
 
 ClientType = typing.Union[httpx.Client, httpx.AsyncClient]
 

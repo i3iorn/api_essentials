@@ -5,13 +5,13 @@ from typing import Optional, List, TYPE_CHECKING, Dict, Any, Type
 
 from httpx import URL, BasicAuth, Auth, Client, Response, HTTPStatusError, Request
 
-from auth.grant_type import OAuth2GrantType
-from auth.exceptions import OAuth2TokenExpired, OAuth2TokenInvalid, OAuth2TokenRevoked
-from auth.other import NoAuth
+from .grant_type import OAuth2GrantType
+from .exceptions import OAuth2TokenExpired, OAuth2TokenInvalid, OAuth2TokenRevoked
+from .other import NoAuth
 import logging
 
 if TYPE_CHECKING:
-    from auth.config import OAuth2Config
+    from .config import OAuth2Config
 
 
 class OAuthTokenType(Enum):
@@ -42,14 +42,24 @@ class OAuth2Token:
     grace_period:   Optional[int]       = 60
 
     @property
+    def expires_at(self) -> Optional[datetime]:
+        """
+        Get the expiration time of the token.
+        :return: The expiration time as a datetime object.
+        """
+        if self.expires_in is None:
+            return None
+        return self.created_at + timedelta(seconds=self.expires_in)
+
+    @property
     def is_expired(self) -> bool:
         """
         Check if the token is expired.
         :return: True if the token is expired, False otherwise.
         """
         if self.expires_in is None:
-            return False
-        return datetime.now() > (self.created_at + timedelta(seconds=self.expires_in+self.grace_period))
+            return True
+        return datetime.now() > (self.created_at + timedelta(seconds=self.expires_in) - timedelta(seconds=self.grace_period))
 
     @property
     def is_valid(self) -> bool:
@@ -230,6 +240,9 @@ class OAuth2Token:
             client_secret=data.get("client_secret"),
             redirect_uri=data.get("redirect_uri")
         )
+
+    def __repr__(self):
+        return f"OAuth2Token(access_token={self.access_token}, refresh_token={self.refresh_token}, token_type={self.token_type}, expires_at={self.expires_at}, scope={self.scope})"
 
 class RiskAnalyticsToken(OAuth2Token):
     @classmethod
