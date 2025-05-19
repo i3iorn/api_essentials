@@ -46,6 +46,19 @@ class BaseOAuth2(Auth):
 
         yield request
 
+    async def async_auth_flow(
+        self, request: Request
+    ) -> typing.AsyncGenerator[Request, Response]:
+        """
+        Asynchronous authentication flow for OAuth2.
+        """
+        self.logger.debug("Starting OAuth2 async auth flow.")
+        token: OAuth2Token = self._get_token()
+        request.headers["Authorization"] = f"Bearer {token.access_token}"
+        request.headers["Content-Type"] = "application/json"
+
+        yield request
+
     def _get_token(self) -> "OAuth2Token":
         """
         Get the access token for the OAuth2 configuration.
