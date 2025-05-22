@@ -4,6 +4,7 @@ from typing import Optional
 from dataclasses import dataclass
 import logging
 import threading
+import uuid
 
 # Set up logging for debugging and error reporting
 logger = logging.getLogger(__name__)
@@ -78,7 +79,7 @@ class Base64Encoder:
 
 # RequestId descriptor class
 class RequestId:
-    def __init__(self, config: RequestIdConfig):
+    def __init__(self, config: RequestIdConfig = RequestIdConfig()):
         self._config = config
         self._private_name = None
         self._lock = threading.Lock()
@@ -92,6 +93,8 @@ class RequestId:
             'hex': HexEncoder,
             'base64': Base64Encoder
         }
+        # Unique identifier for this descriptor instance
+        self._descriptor_uuid = uuid.uuid4()
 
     def __set_name__(self, owner, name):
         """Set the name of the attribute this descriptor will manage."""
@@ -100,7 +103,8 @@ class RequestId:
     def __get__(self, instance: object, owner: type) -> bytes:
         """Get the RequestId for an instance."""
         if instance is None:
-            return self
+            # Return descriptor's own UUID when accessed on class
+            return self._descriptor_uuid
 
         # If ID doesn't exist, generate a new one
         if not hasattr(instance, self._private_name):
@@ -108,26 +112,13 @@ class RequestId:
                 new_id = self._generate_id()
                 setattr(instance, self._private_name, new_id)
                 if self._config.debug:
-                    logger.debug("[RequestId] Generated new ID for %s: %s", instance, new_id.hex())
+                    logger.debug("[RequestId] Generated new ID for %s: %s", instance, new_id)
 
         return getattr(instance, self._private_name)
 
     def __set__(self, instance: object, value: Optional[bytes]):
-        """Set a new RequestId value, preventing reassignment."""
-        if instance is None:
-            raise RequestIdError("Instance must be provided.")
-
-        # Prevent re-assignment once set
-        if hasattr(instance, self._private_name):
-            raise RequestIdError("RequestId is immutable and cannot be changed.")
-
-        # Validate the provided value
-        if value is None:
-            value = self._generate_id()
-        else:
-            RequestIdValidator.validate(value, self._config.length, self._config.prefix)
-
-        setattr(instance, self._private_name, value)
+        # Prevent direct assignment of request_id
+        raise AttributeError("Cannot set request ID directly.")
 
     def __delete__(self, instance: object):
         """Prevent deletion of the RequestId."""
@@ -135,7 +126,8 @@ class RequestId:
 
     def _generate_id(self) -> bytes:
         """Generate a random ID with optional prefix."""
-        return IdGenerator.generate(self._config.length, self._config.prefix)
+        # Generate a new UUID for each instance
+        return uuid.uuid4()
 
     def get_encoded(self, instance: object, encoding: str = 'hex') -> str:
         """Get the encoded version of the RequestId."""
@@ -187,3 +179,14 @@ class RequestId:
         """Reset the ID for testing purposes (without changing immutability)."""
         if hasattr(instance, self._private_name):
             delattr(instance, self._private_name)
+
+    def __eq__(self, other: object) -> bool:
+        """Compare equality of two RequestId descriptors based on their unique UUID."""
+        if not isinstance(other, RequestId):
+            return False
+        return getattr(self, '_descriptor_uuid', None) == getattr(other, '_descriptor_uuid', None)
+
+    def __ne__(self, other: object) -> bool:
+        """Inequality comparison for RequestId descriptors."""
+        return not self.__eq__(other)
+

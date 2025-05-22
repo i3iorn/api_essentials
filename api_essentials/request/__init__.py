@@ -1,6 +1,6 @@
 import httpx
 
-from api_essentials.request.request_id import RequestIdDescriptor
+from api_essentials.request.request_id import RequestId
 
 
 class Request(httpx.Request):

@@ -82,6 +82,9 @@ class BaseOAuth2(Auth):
         self.logger.debug("Setting up OAuth2 auth flow.")
         try:
             token: OAuth2Token = self._get_token()
+        except AttributeError:
+            # propagate attribute errors (e.g., async client misuse)
+            raise
         except Exception as e:
             self.logger.error("Failed to get OAuth2 token: %s", str(e))
             raise RuntimeError("Failed to get OAuth2 token.") from e
@@ -124,4 +127,3 @@ class BaseOAuth2(Auth):
         else:
             self.logger.error("No token class provided.")
             raise RuntimeError("No token class provided.")
-
