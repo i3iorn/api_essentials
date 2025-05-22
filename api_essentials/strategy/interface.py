@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Protocol
+from typing import Protocol, Any
 
 
 class Strategy(Protocol):
@@ -14,8 +14,9 @@ class SimpleStrategy(Strategy):
     A simple strategy that does not require any additional configuration.
     """
     @abstractmethod
-    def execute(self, *args, **kwargs):
+    def execute(self, *args: Any, **kwargs: Any) -> Any:
         """
         Execute the strategy.
         """
         pass
+

@@ -5,6 +5,7 @@ from typing import Optional, List, TYPE_CHECKING, Dict, Any, Type
 
 from httpx import URL, BasicAuth, Auth, Client, Response, HTTPStatusError, Request
 
+from .constants import TOKEN_GRACE_PERIOD
 from .grant_type import OAuth2GrantType
 from .exceptions import OAuth2TokenExpired, OAuth2TokenInvalid, OAuth2TokenRevoked
 from .other import NoAuth
@@ -25,7 +26,48 @@ class OAuthTokenType(Enum):
 @dataclass(frozen=True)
 class OAuth2Token:
     """
-    Data class to hold OAuth2 token information.
+    Data class to hold OAuth2 token information. This class provides methods to check
+    the token's validity, expiration, and to refresh the token if necessary.
+    It also provides methods to convert the token to and from a dictionary format.
+    This class is immutable and should be instantiated with all required parameters.
+    The token is considered valid if it is not expired and has a non-null access token.
+    The token is considered expired if the current time is greater than the expiration
+    time minus the grace period. The token is considered revoked if the access token is
+    null.
+
+    Attributes:
+        access_token (str): The access token.
+        refresh_token (Optional[str]): The refresh token.
+        token_type (Optional[OAuthTokenType]): The type of the token (access or refresh).
+        expires_in (Optional[int]): The expiration time in seconds.
+        scope (Optional[List[str]]): The scope of the token.
+        grant_type (Optional[OAuth2GrantType]): The grant type used to obtain the token.
+        token_url (Optional[URL]): The URL to request the token.
+        client_id (Optional[str]): The client ID.
+        client_secret (Optional[str]): The client secret.
+        redirect_uri (Optional[URL]): The redirect URI.
+        created_at (Optional[datetime]): The time the token was created.
+        logger (Optional[logging.Logger]): Logger instance for logging.
+        grace_period (Optional[int]): The grace period for token expiration. The grace
+            period is the time before the token is considered expired. Defaults to
+            60 seconds. Use environmental variable AUTH_TOKEN_GRACE_PERIOD to set a
+            different value.
+
+    Methods:
+        expires_at: Returns the expiration time of the token.
+        is_expired: Checks if the token is expired.
+        is_valid: Checks if the token is valid.
+        is_revoked: Checks if the token is revoked.
+        token: Returns the access token.
+        refresh: Refreshes the token using the refresh_token grant.
+        request_new: Requests a new token using the provided OAuth2 configuration.
+        to_dict: Converts the OAuth2Token instance to a dictionary.
+        from_dict: Creates an OAuth2Token instance from a dictionary.
+
+    Raises:
+        OAuth2TokenExpired: If the token is expired.
+        OAuth2TokenInvalid: If the token is invalid or cannot be refreshed.
+        OAuth2TokenRevoked: If the token is revoked.
     """
     access_token:   str
     refresh_token:  Optional[str]       = None
@@ -39,7 +81,7 @@ class OAuth2Token:
     redirect_uri:   Optional[URL]       = None
     created_at:     Optional[datetime]  = field(default_factory=datetime.now)
     logger:         Optional[logging.Logger] = field(default_factory=logging.getLogger, repr=False)
-    grace_period:   Optional[int]       = 60
+    grace_period:   Optional[int]       = TOKEN_GRACE_PERIOD
 
     @property
     def expires_at(self) -> Optional[datetime]:

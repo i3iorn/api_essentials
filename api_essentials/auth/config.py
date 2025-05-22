@@ -1,14 +1,15 @@
 import logging
 from dataclasses import dataclass
-from typing import Optional, List, Union, TYPE_CHECKING, Type
+from typing import Optional, List, Union, Type
 
 import httpx
 from httpx import URL, AsyncClient, Client
 
-from api_essentials.strategy.strategies.scope_strategies import ScopeStrategy, ScopeExecutionMode
+from api_essentials.strategy.strategies.scope_strategies import ScopeStrategy
 from api_essentials.auth.token import OAuth2Token
 from .grant_type import OAuth2GrantType
 from .oauth2 import OAuth2ResponseType, ClientType
+from .constants import AUTH_TIMEOUT, AUTH_REDIRECTS, SSL_VERIFICATION
 
 
 class ConfigValidator:
@@ -21,30 +22,29 @@ class ConfigValidator:
         """
         Validate the OAuth2 configuration.
         :param config: The OAuth2 configuration to validate.
+        :raises ValueError: If any configuration value is invalid.
         """
-        if not isinstance(config.client_id, str):
-            raise ValueError("Client ID must be a string.")
-        if not isinstance(config.client_secret, str):
-            raise ValueError("Client secret must be a string.")
-        if not isinstance(config.token_url, URL):
-            raise ValueError("Token URL must be a valid URL.")
+        if not isinstance(config.client_id, str) or not config.client_id:
+            raise ValueError("Client ID must be a non-empty string.")
+        if not isinstance(config.client_secret, str) or not config.client_secret:
+            raise ValueError("Client secret must be a non-empty string.")
+        if not isinstance(config.token_url, URL) or not getattr(config.token_url, 'host', None):
+            raise ValueError("Token URL must be a valid URL with a host.")
         if config.token_url.scheme not in ["http", "https"]:
             raise ValueError("Token URL must use HTTP or HTTPS scheme.")
-        if config.token_url.host is None:
-            raise ValueError("Token URL must have a valid host.")
-        if "." not in config.token_url.host:
+        if config.token_url.host is None or "." not in config.token_url.host:
             raise ValueError("Token URL must have a valid domain.")
-        if config.redirect_uri and not isinstance(config.redirect_uri, URL):
-            raise ValueError("Redirect URI must be a valid URL.")
+        if config.redirect_uri and (not isinstance(config.redirect_uri, URL) or not getattr(config.redirect_uri, 'host', None)):
+            raise ValueError("Redirect URI must be a valid URL with a host.")
         if config.client and not isinstance(config.client, (Client, AsyncClient)):
             raise ValueError("Client must be an instance of httpx.Client or httpx.AsyncClient.")
         if config.access_token and not isinstance(config.access_token, OAuth2Token):
             raise ValueError("Access token must be an instance of OAuth2Token.")
         if config.refresh_token and not isinstance(config.refresh_token, OAuth2Token):
             raise ValueError("Refresh token must be an instance of OAuth2Token.")
-        if config.token_class and not issubclass(config.token_class, OAuth2Token):
+        if config.token_class is not None and not (isinstance(config.token_class, type) and issubclass(config.token_class, OAuth2Token)):
             raise ValueError("Token class must be a subclass of OAuth2Token.")
-        if config._scope and not isinstance(config._scope, list):
+        if config._scope and (not isinstance(config._scope, list) or not all(isinstance(item, str) for item in config._scope)):
             raise ValueError("Scope must be a list of strings.")
         if config._scope_strategy and not isinstance(config._scope_strategy, ScopeStrategy):
             raise ValueError("Scope strategy must be an instance of ScopeStrategy.")
@@ -67,12 +67,16 @@ class OAuth2Config:
     access_token:       Optional["OAuth2Token"]       = None
     refresh_token:      Optional["OAuth2Token"]       = None
     token_class:        Optional[Type["OAuth2Token"]] = OAuth2Token
+    verify:             Optional[bool]                = SSL_VERIFICATION
+    timeout:            Optional[int | float]         = AUTH_TIMEOUT
+    redirects:          Optional[int]                 = AUTH_REDIRECTS
     _scope:             Optional[List[str]]           = None
     _scope_strategy:    Optional[ScopeStrategy]       = ScopeStrategy(delimiter=" ")
     _grant_type:        Optional[OAuth2GrantType]     = OAuth2GrantType.CLIENT_CREDENTIALS
     _response_type:     Optional[OAuth2ResponseType]  = OAuth2ResponseType.CODE
+    logger:             logging.Logger                = logging.getLogger(__name__)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """
         Post-initialization method to set default values for the OAuth2 configuration.
         """
@@ -83,28 +87,28 @@ class OAuth2Config:
     def scope(self) -> str:
         """
         Get the scope for the OAuth2 configuration.
-        :return: The scope as a list of strings.
+        :return: The scope as a single string (order preserved, deduplicated).
         """
-        scopes = self._scope or []
-        return self.scope_strategy.merge_scopes(scopes)
+        scopes: List[str] = self._scope or []
+        # Order-preserving deduplication
+        seen = set()
+        scopes_deduped = [x for x in scopes if not (x in seen or seen.add(x))]
+        return self.scope_strategy.merge_scopes(scopes_deduped)
 
     @scope.setter
-    def scope(self, value: Union[str, List[str]]):
+    def scope(self, value: Union[str, List[str]]) -> None:
         """
         Set the scope for the OAuth2 configuration.
         :param value: The scope to set, either as a string or a list of strings.
+        :raises ValueError: If the value is not a string or list of strings.
         """
         if isinstance(value, str):
             value = self._scope_strategy.split_scopes(value)
             if isinstance(value, str):
                 value = [value]
-        if not isinstance(value, list):
+        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
             raise ValueError("Scope must be a string or a list of strings.")
-        if not all(isinstance(item, str) for item in value):
-            raise ValueError("All items in the scope list must be strings.")
-
-        self.logger.debug(f"Setting scope: {value}")
-
+        self.logger.debug("Setting scope (not logging value for security reasons)")
         self._scope = value
 
     @property
@@ -120,12 +124,11 @@ class OAuth2Config:
         """
         Set the scope strategy for the OAuth2 configuration.
         :param value: The scope strategy to set.
+        :raises ValueError: If the value is not a ScopeStrategy instance.
         """
         if not isinstance(value, ScopeStrategy):
             raise ValueError("Scope strategy must be an instance of ScopeStrategy.")
-
-        self.logger.debug(f"Setting scope strategy: {value}")
-
+        self.logger.debug("Setting scope strategy (not logging value for security reasons)")
         self._scope_strategy = value
 
     @property
@@ -134,20 +137,18 @@ class OAuth2Config:
         Get the grant type for the OAuth2 configuration.
         :return: The grant type.
         """
-        print(f"Grant type: {self._grant_type}")
         return self._grant_type.value
 
     @grant_type.setter
-    def grant_type(self, value: OAuth2GrantType):
+    def grant_type(self, value: OAuth2GrantType) -> None:
         """
         Set the grant type for the OAuth2 configuration.
         :param value: The grant type to set.
+        :raises ValueError: If the value is not an OAuth2GrantType instance.
         """
         if not isinstance(value, OAuth2GrantType):
             raise ValueError("Grant type must be an instance of OAuth2GrantType.")
-
-        self.logger.debug(f"Setting grant type: {value}")
-
+        self.logger.debug("Setting grant type (not logging value for security reasons)")
         self._grant_type: OAuth2GrantType = value
 
     @property
@@ -159,43 +160,45 @@ class OAuth2Config:
         return self._response_type.value
 
     @response_type.setter
-    def response_type(self, value: OAuth2ResponseType):
+    def response_type(self, value: OAuth2ResponseType) -> None:
         """
         Set the response type for the OAuth2 configuration.
         :param value: The response type to set.
+        :raises ValueError: If the value is not an OAuth2ResponseType instance.
         """
         if not isinstance(value, OAuth2ResponseType):
             raise ValueError("Response type must be an instance of OAuth2ResponseType.")
-
-        self.logger.debug(f"Setting response type: {value}")
-
+        self.logger.debug("Setting response type (not logging value for security reasons)")
         self._response_type: OAuth2ResponseType = value
 
     def add_scope(self, scope: str) -> None:
         """
         Add a scope to the OAuth2 configuration.
         :param scope: The scope to add.
+        :raises ValueError: If the scope is not a string.
         """
-        if not isinstance(scope, str):
-            raise ValueError("Scope must be a string.")
+        if not isinstance(scope, str) or not scope:
+            raise ValueError("Scope must be a non-empty string.")
         if self._scope is None:
             self._scope = []
-
         if scope in self._scope:
-            self.logger.debug(f"Scope '{scope}' already exists in the list.")
+            self.logger.debug("Scope already exists in the list (not logging value for security reasons)")
             return
-
-        self.logger.debug(f"Adding scope: {scope}")
-
+        self.logger.debug("Adding scope (not logging value for security reasons)")
         self._scope.append(scope)
 
     def attach_client(self, client: ClientType) -> None:
         """
         Attach the client to the OAuth2 configuration.
-        :param client: The client to attach.
+
+        Arguments:
+            client (ClientType): The client to attach, either httpx.Client or httpx.AsyncClient.
+        Raises:
+            ValueError: If the client is not an instance of httpx.Client or httpx.AsyncClient.
+        Raises:
+            TypeError: If the client is not of the expected type.
         """
         if not isinstance(client, (httpx.Client, httpx.AsyncClient)):
-            raise ValueError("Client must be an instance of httpx.Client or httpx.AsyncClient.")
-
+            raise TypeError("Client must be an instance of httpx.Client or httpx.AsyncClient.")
         self.logger.debug("Attaching client to OAuth2 configuration.")
         self.client = client

@@ -1,7 +1,6 @@
 import httpx
 from httpx import Auth
 
-
 class NoAuth(Auth):
     """
     No authentication class for httpx.
