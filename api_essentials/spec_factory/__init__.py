@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Union
+from typing import Union, Dict, Any
 from pathlib import Path
 
 from api_essentials.client import APIClient
@@ -8,7 +8,7 @@ from api_essentials.auth.config import OAuth2Config
 
 logger = logging.getLogger(__name__)
 
-def create_client_from_spec(spec: Union[str, Path, dict], **client_kwargs) -> APIClient:
+def create_client_from_spec(spec: Union[str, Path, dict], client_kwargs: Dict[str, Any], oauth_kwargs: Dict[str, Any]) -> APIClient:
     """
     Create an APIClient object from an OpenAPI or Swagger specification.
 
@@ -35,13 +35,13 @@ def create_client_from_spec(spec: Union[str, Path, dict], **client_kwargs) -> AP
 
     logger.info("Detected specification version: %s", version)
     if version.startswith("3."):
-        return _create_client_from_openapi_v3(spec, **client_kwargs)
+        return _create_client_from_openapi_v3(spec, client_kwargs, oauth_kwargs)
     elif version.startswith("2."):
-        return _create_client_from_swagger_v2(spec, **client_kwargs)
+        return _create_client_from_swagger_v2(spec, client_kwargs, oauth_kwargs)
     else:
         raise ValueError(f"Unsupported specification version: {version}")
 
-def _create_client_from_openapi_v3(spec: dict, **client_kwargs) -> APIClient:
+def _create_client_from_openapi_v3(spec: dict, client_kwargs: Dict[str, Any], oauth_kwargs: Dict[str, Any]) -> APIClient:
     """
     Create an APIClient from an OpenAPI 3.x specification.
 
@@ -54,10 +54,10 @@ def _create_client_from_openapi_v3(spec: dict, **client_kwargs) -> APIClient:
     """
     logger.debug("Creating client from OpenAPI 3.x specification.")
     base_url = spec.get("servers", [{}])[0].get("url", "")
-    oauth_config = _extract_oauth_config(spec.get("components", {}).get("securitySchemes", {}))
+    oauth_config = _extract_oauth_config(spec.get("components", {}).get("securitySchemes", {}), oauth_kwargs)
     return APIClient(config=oauth_config, base_url=base_url, **client_kwargs)
 
-def _create_client_from_swagger_v2(spec: dict, **client_kwargs) -> APIClient:
+def _create_client_from_swagger_v2(spec: dict, client_kwargs: Dict[str, Any], oauth_kwargs: Dict[str, Any]) -> APIClient:
     """
     Create an APIClient from a Swagger 2.0 specification.
 
@@ -70,10 +70,10 @@ def _create_client_from_swagger_v2(spec: dict, **client_kwargs) -> APIClient:
     """
     logger.debug("Creating client from Swagger 2.0 specification.")
     base_url = spec.get("host", "") + spec.get("basePath", "")
-    oauth_config = _extract_oauth_config(spec.get("securityDefinitions", {}))
+    oauth_config = _extract_oauth_config(spec.get("securityDefinitions", {}), **oauth_kwargs)
     return APIClient(config=oauth_config, base_url=base_url, **client_kwargs)
 
-def _extract_oauth_config(security_schemes: dict) -> OAuth2Config:
+def _extract_oauth_config(security_schemes: dict, client_id: str, client_secret: str) -> OAuth2Config:
     """
     Extract OAuth2 configuration from security schemes.
 
@@ -92,8 +92,8 @@ def _extract_oauth_config(security_schemes: dict) -> OAuth2Config:
             token_url = scheme.get("tokenUrl", "")
             scopes = list(scheme.get("flows", {}).get("clientCredentials", {}).get("scopes", {}).keys())
             return OAuth2Config(
-                client_id="your_client_id",  # Replace with actual client ID
-                client_secret="your_client_secret",  # Replace with actual client secret
+                client_id=client_id,
+                client_secret=client_secret,
                 token_url=token_url,
                 scope=scopes
             )
