@@ -111,4 +111,12 @@ def _extract_oauth_config(security_schemes: dict, client_id: str, client_secret:
                 token_url=token_url,
                 scope=scopes
             )
-    raise ValueError("No OAuth2 configuration found in security schemes.")
+
+    logger.warning(f"No OAuth2 security scheme found in the specification. "
+                   f"Trying default oauth2 configuration with empty scopes.")
+    return OAuth2Config(
+        client_id=client_id,
+        client_secret=client_secret,
+        token_url=kwargs.get("tokenUrl"),
+        scope=DEFAULT_SCOPES
+    )
