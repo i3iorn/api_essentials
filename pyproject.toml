@@ -1,3 +1,7 @@
+[authors]
+name = "Björn Schrammel"
+email = "api_essentials@schrammel.dev"
+
 [tool.poetry]
 name = "api-essentials"
 version = "0.1.0"
