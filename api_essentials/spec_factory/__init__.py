@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Union, Dict, Any
+from typing import Union, Dict, Any, Optional
 from pathlib import Path
 
 from api_essentials.client import APIClient
@@ -8,13 +8,18 @@ from api_essentials.auth.config import OAuth2Config
 
 logger = logging.getLogger(__name__)
 
-def create_client_from_spec(spec: Union[str, Path, dict], client_kwargs: Dict[str, Any], oauth_kwargs: Dict[str, Any]) -> APIClient:
+def create_client_from_spec(
+        spec: Union[str, Path, dict],
+        oauth_kwargs: Dict[str, Any],
+        client_kwargs: Optional[Dict[str, Any]] = None
+) -> APIClient:
     """
     Create an APIClient object from an OpenAPI or Swagger specification.
 
     Args:
         spec (Union[str, Path, dict]): The OpenAPI or Swagger specification. Can be a file path, URL, or dictionary.
-        **client_kwargs: Additional keyword arguments for the APIClient.
+        client_kwargs: Additional keyword arguments for the APIClient.
+        oauth_kwargs: OAuth2 configuration parameters, such as client_id and client_secret.
 
     Returns:
         APIClient: Configured API client.
@@ -22,6 +27,9 @@ def create_client_from_spec(spec: Union[str, Path, dict], client_kwargs: Dict[st
     Raises:
         ValueError: If the specification is invalid or unsupported.
     """
+    if client_kwargs is None:
+        client_kwargs = {}
+
     if isinstance(spec, (str, Path)):
         logger.debug("Loading specification from file or URL: %s", spec)
         with open(spec, 'r') as f:
