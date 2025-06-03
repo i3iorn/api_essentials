@@ -1,8 +1,5 @@
-[authors]
-name = "Björn Schrammel"
-email = "api_essentials@schrammel.dev"
-
 [tool.poetry]
+authors = ["Björn Schrammel"]
 name = "api-essentials"
 version = "0.1.0"
 description = "A collection of essentials for various API functionalities."
