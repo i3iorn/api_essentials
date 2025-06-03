@@ -8,6 +8,9 @@ from api_essentials.auth.config import OAuth2Config
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_SCOPES = []
+DEFAULT_AUTH_SCHEMA_TYPE = "oauth2"
+
 def create_client_from_spec(
         spec: Union[str, Path, dict],
         oauth_kwargs: Dict[str, Any],
@@ -95,10 +98,13 @@ def _extract_oauth_config(security_schemes: dict, client_id: str, client_secret:
         ValueError: If no OAuth2 configuration is found.
     """
     for scheme_name, scheme in security_schemes.items():
-        if scheme.get("type") == "oauth2":
+        if scheme.get("type", DEFAULT_AUTH_SCHEMA_TYPE) == "oauth2":
             logger.debug("Found OAuth2 security scheme: %s", scheme_name)
-            token_url = scheme.get("tokenUrl", "")
+            token_url = kwargs.get("tokenUrl", scheme.get("tokenUrl"))
             scopes = list(scheme.get("flows", {}).get("clientCredentials", {}).get("scopes", {}).keys())
+            if len(scopes) == 0:
+                scopes = DEFAULT_SCOPES
+
             return OAuth2Config(
                 client_id=client_id,
                 client_secret=client_secret,
