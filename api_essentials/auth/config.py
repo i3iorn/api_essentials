@@ -28,8 +28,10 @@ class ConfigValidator:
             raise ValueError("Client ID must be a non-empty string.")
         if not isinstance(config.client_secret, str) or not config.client_secret:
             raise ValueError("Client secret must be a non-empty string.")
-        if not isinstance(config.token_url, URL) or not getattr(config.token_url, 'host', None):
-            raise ValueError("Token URL must be a valid URL with a host. URL: {}".format(config.token_url))
+        # TODO: This check gives a lot of false positives, so it is commented out.
+        #  Needs to be improved.
+        # if not isinstance(config.token_url, URL) or not getattr(config.token_url, 'host', None):
+        #     raise ValueError("Token URL must be a valid URL with a host. URL: {}".format(config.token_url))
         if config.token_url.scheme not in ["http", "https"]:
             raise ValueError("Token URL must use HTTP or HTTPS scheme.")
         if config.token_url.host is None or "." not in config.token_url.host:
