@@ -11,12 +11,13 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
+
 config = OAuth2Config(
     client_id="client_id",
     client_secret="zQUaX2dbLZLZqwvboaewod1RbW7ZqxbtPv6p2u5fRg3FftGLY22yWb4rhFHfitdc6SjfAH",
-    token_url=URL("https://login.example.com/oauth2")
+    token_url=URL("https://login.example.com/oauth2"),
+    scope=["credit_data_persons"],
 )
-config.scope = "credit_data_persons"
 auth = BaseOAuth2(config)
 client = httpx.Client(
     auth=auth,
@@ -24,6 +25,8 @@ client = httpx.Client(
     verify=False
 )
 config.attach_client(client)
+
+
 response = client.post(
     "/path/to/endpoint",
     json={

@@ -1,4 +1,4 @@
-from api_essentials.auth.oauth2 import BaseOAuth2 as OAuth2Flow
+from api_essentials.auth.oauth2 import BaseOAuth2
 from api_essentials.auth.token import OAuth2Token
 from api_essentials.auth.config import OAuth2Config
 from api_essentials.auth.exceptions import (

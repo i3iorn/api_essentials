@@ -54,27 +54,70 @@ class ConfigValidator:
             raise ValueError("Response type must be an instance of OAuth2ResponseType.")
 
 
-@dataclass
 class OAuth2Config:
     """
-    Data class to hold OAuth2 configuration information.
+    Class to hold OAuth2 configuration information.
     """
-    client_id:          str
-    client_secret:      str
-    token_url:          URL
-    redirect_uri:       Optional[URL]                 = None
-    client:             Optional[Union[Client, AsyncClient]] = None
-    access_token:       Optional["OAuth2Token"]       = None
-    refresh_token:      Optional["OAuth2Token"]       = None
-    token_class:        Optional[Type["OAuth2Token"]] = OAuth2Token
-    verify:             Optional[bool]                = SSL_VERIFICATION
-    timeout:            Optional[int | float]         = AUTH_TIMEOUT
-    redirects:          Optional[int]                 = AUTH_REDIRECTS
-    _scope:             Optional[List[str]]           = None
-    _scope_strategy:    Optional[ScopeStrategy]       = ScopeStrategy(delimiter=" ")
-    _grant_type:        Optional[OAuth2GrantType]     = OAuth2GrantType.CLIENT_CREDENTIALS
-    _response_type:     Optional[OAuth2ResponseType]  = OAuth2ResponseType.CODE
-    logger:             logging.Logger                = logging.getLogger(__name__)
+
+    def __init__(
+        self,
+        client_id: str,
+        client_secret: str,
+        token_url: URL,
+        *, # Using * to enforce keyword-only arguments for the remaining arguments
+        redirect_uri: Optional[URL] = None,
+        client: Optional[Union[Client, AsyncClient]] = None,
+        access_token: Optional["OAuth2Token"] = None,
+        refresh_token: Optional["OAuth2Token"] = None,
+        token_class: Optional[Type["OAuth2Token"]] = OAuth2Token,
+        verify: Optional[bool] = SSL_VERIFICATION,
+        timeout: Optional[Union[int, float]] = AUTH_TIMEOUT,
+        redirects: Optional[int] = AUTH_REDIRECTS,
+        logger: Optional[logging.Logger] = None,
+        scope: Optional[List[str]] = None,
+        scope_strategy: Optional[ScopeStrategy] = ScopeStrategy(delimiter=" "),
+        grant_type: Optional[OAuth2GrantType] = OAuth2GrantType.CLIENT_CREDENTIALS,
+        response_type: Optional[OAuth2ResponseType] = OAuth2ResponseType.CODE,
+    ) -> None:
+        """
+        Initialize the OAuth2 configuration.
+
+        Args:
+            client_id (str): The client ID for OAuth2.
+            client_secret (str): The client secret for OAuth2.
+            token_url (URL): The URL to obtain the OAuth2 token.
+            redirect_uri (Optional[URL]): The redirect URI for OAuth2.
+            client (Optional[Union[Client, AsyncClient]]): The HTTP client to use for requests.
+            access_token (Optional[OAuth2Token]): The access token instance.
+            refresh_token (Optional[OAuth2Token]): The refresh token instance.
+            token_class (Optional[Type[OAuth2Token]]): The class to use for tokens.
+            verify (Optional[bool]): Whether to verify SSL certificates.
+            timeout (Optional[Union[int, float]]): Request timeout in seconds.
+            redirects (Optional[int]): Maximum number of redirects to follow.
+            logger (Optional[logging.Logger]): Logger instance for logging.
+            scope (Optional[List[str]]): List of scopes for OAuth2.
+            scope_strategy (Optional[ScopeStrategy]): Strategy for handling scopes.
+            grant_type (Optional[OAuth2GrantType]): Grant type for OAuth2.
+            response_type (Optional[OAuth2ResponseType]): Response type for OAuth2.
+        """
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.token_url = token_url
+        self.redirect_uri = redirect_uri
+        self.client = client
+        self.access_token = access_token
+        self.refresh_token = refresh_token
+        self.token_class = token_class
+        self.verify = verify
+        self.timeout = timeout
+        self.redirects = redirects
+        self.logger = logger or logging.getLogger(__name__)
+        self._scope = scope or []
+        self._scope_strategy = scope_strategy
+        self._grant_type = grant_type
+        self._response_type = response_type
+
+        self.__post_init__()
 
     def __post_init__(self) -> None:
         """
@@ -95,8 +138,7 @@ class OAuth2Config:
         scopes_deduped = [x for x in scopes if not (x in seen or seen.add(x))]
         return self.scope_strategy.merge_scopes(scopes_deduped)
 
-    @scope.setter
-    def scope(self, value: Union[str, List[str]]) -> None:
+    def set_scope(self, value: Union[str, List[str]]) -> None:
         """
         Set the scope for the OAuth2 configuration.
         :param value: The scope to set, either as a string or a list of strings.
@@ -137,7 +179,7 @@ class OAuth2Config:
         Get the grant type for the OAuth2 configuration.
         :return: The grant type.
         """
-        return self._grant_type.value
+        return self._grant_type.value()
 
     @grant_type.setter
     def grant_type(self, value: OAuth2GrantType) -> None:
@@ -157,7 +199,7 @@ class OAuth2Config:
         Get the response type for the OAuth2 configuration.
         :return: The response type.
         """
-        return self._response_type.value
+        return self._response_type.value()
 
     @response_type.setter
     def response_type(self, value: OAuth2ResponseType) -> None:
