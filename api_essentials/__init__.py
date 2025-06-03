@@ -8,7 +8,10 @@ from api_essentials.auth.exceptions import (
     OAuth2TokenException,
     OAuth2Exception
 )
+from api_essentials.models.request import Request
+from api_essentials.models.response import Response
 from api_essentials.utils.log import setup_secret_filter
+from api_essentials.spec_factory import create_client_from_spec
 
 setup_secret_filter()  # Ensure all logs are filtered for secrets
 
@@ -22,4 +25,8 @@ __all__ = [
     "OAuth2TokenRevoked",
     "OAuth2TokenException",
     "OAuth2Exception",
+    "Request",
+    "Response",
+    "create_client_from_spec",
+    "setup_secret_filter"
 ]
