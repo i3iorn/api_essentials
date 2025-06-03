@@ -3,9 +3,7 @@ from copy import copy
 import pytest
 import uuid
 
-from pydantic import UUID4
-
-from api_essentials.request.request_id import RequestId
+from api_essentials.models.request import RequestId
 
 
 class SampleClass:

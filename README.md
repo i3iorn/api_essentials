@@ -9,10 +9,12 @@ The `RequestId` descriptor provides a per-instance, immutable UUID4 for your cla
 ### Usage Example
 
 ```python
-from api_essentials.request.request_id import RequestId
+from api_essentials.models.request import RequestId
+
 
 class MyRequest:
     request_id = RequestId()
+
 
 req = MyRequest()
 print(req.request_id)  # uuid.UUID instance
