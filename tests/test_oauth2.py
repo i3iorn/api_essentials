@@ -119,12 +119,12 @@ class TestConfigValidator:
 
 class TestOAuth2ConfigProperties:
     def test_scope_setter_with_string(self, basic_config):
-        basic_config.scope = "one two"
+        basic_config.set_scope("one two")
         assert basic_config._scope == ["one", "two"]
         assert isinstance(basic_config.scope, str)
 
     def test_scope_setter_with_list(self, basic_config):
-        basic_config.scope = ["x", "y"]
+        basic_config.set_scope(["x", "y"])
         assert basic_config._scope == ["x", "y"]
         assert "x" in basic_config.scope
 
@@ -257,7 +257,7 @@ class TestRFC6749Compliance:
         assert params["client_id"] == "cid"
 
     def test_scope_parameter_serialization(self, basic_config):
-        basic_config.scope = ["a", "b", "c"]
+        basic_config.set_scope(["a", "b", "c"])
         s = basic_config.scope
         assert isinstance(s, str) and " " in s
 

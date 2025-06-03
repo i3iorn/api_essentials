@@ -44,18 +44,18 @@ def test_multiple_request_ids():
 
 def test_request_id_hex_encoding():
     instance = SampleClass()
-    hex_val = SampleClass.__dict__['request_id'].to_hex(instance)
+    hex_val = SampleClass.__dict__['request_id'].to_hex()
     assert isinstance(hex_val, str)
     assert len(hex_val) == 32  # UUID in hex is 32 characters long
     assert all(c in '0123456789abcdef' for c in hex_val)
 
 def test_request_id_base64_encoding():
-    # TODO: Implement base64 encoding test
     instance = SampleClass()
+    b64_val = SampleClass.__dict__['request_id'].to_base64()
+    assert isinstance(b64_val, str)
 
 def test_request_id_to_json():
-    instance = SampleClass()
-    b64_val = SampleClass.__dict__['request_id'].to_json(instance)
+    b64_val = SampleClass.__dict__['request_id'].to_json()
     assert isinstance(b64_val, str)
 
 def test_request_id_from_encoded_raises():

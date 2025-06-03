@@ -23,6 +23,6 @@ class Request(httpx.Request):
         super().__init__(*args, **kwargs)
         self.extensions["token_request"]    = None
         self.extensions["token_response"]   = None
-        self.extensions["request_id"]       = RequestId().get_encoded("hex")
+        self.extensions["request_id"]       = RequestId()._get_encoded("hex")
         self.extensions["perf_request_time"]= None
         self.extensions["http_version"]     = None

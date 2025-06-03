@@ -98,7 +98,7 @@ class RequestId:
     def _generate_id(self) -> uuid.UUID:
         return uuid.uuid4()
 
-    def get_encoded(self, encoding: str = 'hex') -> str:
+    def _get_encoded(self, encoding: str = 'hex') -> str:
         """Get the encoded version of the RequestId."""
         if encoding == 'hex':
             return self._descriptor_uuid.hex
@@ -108,9 +108,17 @@ class RequestId:
         else:
             raise EncodingError(f"Unsupported encoding '{encoding}'")
 
-    def to_json(self, instance: Any) -> str:
+    def to_hex(self) -> str:
+        """Return the hex-encoded RequestId."""
+        return self._get_encoded(encoding='hex')
+
+    def to_base64(self) -> str:
         """Return the base64-encoded RequestId."""
-        encoded = self.get_encoded(encoding='base64')
+        return self._get_encoded(encoding='base64')
+
+    def to_json(self) -> str:
+        """Return the base64-encoded RequestId."""
+        encoded = self._get_encoded(encoding='base64')
         return encoded
 
     def from_encoded(self, instance: Any, encoded: str, encoding: str = 'hex') -> None:
