@@ -213,10 +213,10 @@ class OAuth2Token:
                     "Accept": "application/json"
                 }
             )
-            cur_auth = None
+            cur_auth: Optional[Auth] = None
         else:
             client = config.client
-            cur_auth: Auth = client.auth
+            cur_auth: Optional[Auth] = client.auth
             client.auth = BasicAuth(config.client_id, config.client_secret)
 
         try:
