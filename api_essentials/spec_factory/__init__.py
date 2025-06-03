@@ -62,7 +62,7 @@ def _create_client_from_openapi_v3(spec: dict, client_kwargs: Dict[str, Any], oa
     """
     logger.debug("Creating client from OpenAPI 3.x specification.")
     base_url = spec.get("servers", [{}])[0].get("url", "")
-    oauth_config = _extract_oauth_config(spec.get("components", {}).get("securitySchemes", {}), oauth_kwargs)
+    oauth_config = _extract_oauth_config(spec.get("components", {}).get("securitySchemes", {}), **oauth_kwargs)
     return APIClient(config=oauth_config, base_url=base_url, **client_kwargs)
 
 def _create_client_from_swagger_v2(spec: dict, client_kwargs: Dict[str, Any], oauth_kwargs: Dict[str, Any]) -> APIClient:
@@ -81,7 +81,7 @@ def _create_client_from_swagger_v2(spec: dict, client_kwargs: Dict[str, Any], oa
     oauth_config = _extract_oauth_config(spec.get("securityDefinitions", {}), **oauth_kwargs)
     return APIClient(config=oauth_config, base_url=base_url, **client_kwargs)
 
-def _extract_oauth_config(security_schemes: dict, client_id: str, client_secret: str) -> OAuth2Config:
+def _extract_oauth_config(security_schemes: dict, client_id: str, client_secret: str, **kwargs) -> OAuth2Config:
     """
     Extract OAuth2 configuration from security schemes.
 
