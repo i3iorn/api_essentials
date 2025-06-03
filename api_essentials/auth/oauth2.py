@@ -21,7 +21,11 @@ class OAuth2ResponseType(Enum):
     CODE = "code"
     TOKEN = "token"
 
-class BaseOAuth2(Auth):
+
+class BaseAuth(Auth):
+    pass
+
+class BaseOAuth2(BaseAuth):
     requires_request_body:  bool = True
     requires_response_body: bool = True
 

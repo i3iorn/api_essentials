@@ -24,20 +24,10 @@ class APIClient:
         self.auth = BaseOAuth2(config)
         self.base_url = base_url or (str(config.token_url) if hasattr(config, 'token_url') else None)
         self.client = Client(base_url=self.base_url, auth=self.auth, **client_kwargs)
-        self.request_id = RequestId()
         self.ratelimit = RateLimit(max_requests=max_requests, time_window=time_window)
-
-    def _add_request_id(self, headers: Optional[Dict[str, str]] = None) -> Dict[str, str]:
-        if headers is None:
-            headers = {}
-        # Generate a new request ID for each request
-        rid = self.request_id.__get__(self, self.__class__)
-        headers["X-Request-ID"] = rid.hex
-        return headers
 
     def _build_request(self, method: str, url: str, **kwargs) -> Request:
         headers = kwargs.pop("headers", {})
-        headers = self._add_request_id(headers)
         self.logger.debug("Building request: %s %s headers=%s kwargs=%s", method, url, headers, kwargs)
         return Request(method=method, url=url, headers=headers, **kwargs)
 
