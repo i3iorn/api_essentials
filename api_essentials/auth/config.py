@@ -179,7 +179,7 @@ class OAuth2Config:
         Get the grant type for the OAuth2 configuration.
         :return: The grant type.
         """
-        return self._grant_type.value()
+        return self._grant_type.value
 
     @grant_type.setter
     def grant_type(self, value: OAuth2GrantType) -> None:
@@ -199,7 +199,7 @@ class OAuth2Config:
         Get the response type for the OAuth2 configuration.
         :return: The response type.
         """
-        return self._response_type.value()
+        return self._response_type.value
 
     @response_type.setter
     def response_type(self, value: OAuth2ResponseType) -> None:

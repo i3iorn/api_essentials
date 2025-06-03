@@ -1,6 +1,5 @@
 import logging
 import typing
-from base64 import b64encode
 from typing import TYPE_CHECKING, Generator, AsyncGenerator
 
 import httpx

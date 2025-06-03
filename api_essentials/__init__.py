@@ -5,8 +5,8 @@ from api_essentials.auth.exceptions import (
     OAuth2TokenExpired,
     OAuth2TokenInvalid,
     OAuth2TokenRevoked,
-    OAuth2TokenError,
-    OAuth2Error
+    OAuth2TokenException,
+    OAuth2Exception
 )
 from api_essentials.utils.log import setup_secret_filter
 
