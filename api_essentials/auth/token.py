@@ -14,6 +14,8 @@ import logging
 if TYPE_CHECKING:
     from .config import OAuth2Config
 
+logger = logging.getLogger(__name__)
+
 
 class OAuthTokenType(Enum):
     """
@@ -172,9 +174,13 @@ class OAuth2Token:
 
         original_auth = None
         if config.client is not None:
+            self.logger.debug("Using provided client for token refresh.")
             original_auth: Auth = config.client.auth
+            self.logger.debug(f"Original auth: {original_auth}")
             client = config.client
+            self.logger.debug(f"Using client: {client}")
         else:
+            self.logger.warning("Client is not set in the configuration. Using new unsecured synchronous client.")
             client = Client(
                 base_url=str(config.token_url),
                 headers={
@@ -182,6 +188,7 @@ class OAuth2Token:
                     "Accept": "application/json"
                 }
             )
+            self.logger.debug("Using new unsecured synchronous client for token refresh.")
 
         client.auth = BasicAuth(config.client_id, config.client_secret)
         self.logger.debug(f"Swapping in basic auth for refresh request: {client.auth}")
@@ -221,7 +228,7 @@ class OAuth2Token:
         :return: A new OAuth2Token instance with the requested token.
         """
         if config.client is None:
-            logging.getLogger(cls.__name__).warning("Client is not set in the configuration. Using new unsecured synchronous client.")
+            logger.warning("Client is not set in the configuration. Using new unsecured synchronous client.")
             client = Client(
                 base_url=str(config.token_url),
                 headers={
@@ -229,13 +236,19 @@ class OAuth2Token:
                     "Accept": "application/json"
                 }
             )
+            logger.debug("Using new unsecured synchronous client for token request.")
             cur_auth: Optional[Auth] = None
+            logger.debug("No current auth set, using BasicAuth for token request.")
         else:
             client = config.client
+            logger.debug(f"Using provided client: {client}")
             cur_auth: Optional[Auth] = client.auth
+            logger.debug(f"Current auth: {cur_auth}")
             client.auth = BasicAuth(config.client_id, config.client_secret)
+        logger.debug(f"Requesting new token with config: {config}")
 
         try:
+            logger.debug("Constructing request for new token.")
             request: Request = Request(
                 method="POST",
                 url=str(config.token_url),
@@ -244,17 +257,22 @@ class OAuth2Token:
                     "scope": config.scope
                 }
             )
-            logging.getLogger(cls.__name__).debug(f"Request url: {request.url}")
-            logging.getLogger(cls.__name__).debug(f"Request headers: {request.headers}")
-            logging.getLogger(cls.__name__).debug(f"Request body: {request.content}")
+            logger.debug(f"Request url: {request.url}")
+            logger.debug(f"Request headers: {request.headers}")
+            logger.debug(f"Request body: {request.content}")
 
             response: Response = client.send(request)
+            logger.debug(f"Received response: {response}")
             response.raise_for_status()
+            logger.debug(f"Response status code: {response.status_code}")
             token_data: Dict[str, Any] = response.json()
+            logger.debug(f"Parsed token data: {token_data}")
         except HTTPStatusError as e:
+            logger.error(f"HTTPStatusError encountered: {e}")
             raise OAuth2TokenInvalid(f"Failed to request new token: {e.response.status_code} {e.response.text}") from e
         finally:
             # Always restore the original auth
+            logger.debug("Restoring original auth after token request.")
             if cur_auth is not None:
                 client.auth = cur_auth
 
