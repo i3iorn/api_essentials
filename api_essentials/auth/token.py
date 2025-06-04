@@ -35,7 +35,7 @@ class OAuth2ConfigProtocol(Protocol):
     client_secret: str
     grant_type: OAuth2GrantType | str
     scope: Optional[str]
-    token_class: type[OAuth2Token]
+    token_class: type["OAuth2Token"]
 
 
 class _TokenRequestHelper:
