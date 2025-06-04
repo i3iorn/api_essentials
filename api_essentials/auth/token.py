@@ -1,293 +1,332 @@
+import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Optional, List, TYPE_CHECKING, Dict, Any, Type
+from typing import Optional, List, Dict, Any, Protocol
 
-from httpx import URL, BasicAuth, Auth, Client, Response, HTTPStatusError, Request
+from httpx import URL, BasicAuth, Auth, Client, Response, HTTPStatusError, Request, RequestError
 
 from .constants import TOKEN_GRACE_PERIOD
 from .grant_type import OAuth2GrantType
 from .exceptions import OAuth2TokenExpired, OAuth2TokenInvalid, OAuth2TokenRevoked
 from .other import NoAuth
-import logging
 
-if TYPE_CHECKING:
-    from .config import OAuth2Config
-
+# Module-level logger
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 
 class OAuthTokenType(Enum):
     """
-    Enum to represent the type of OAuth2 token.
+    Enum representing the type of OAuth2 token.
     """
     ACCESS = "access"
     REFRESH = "refresh"
 
 
+class OAuth2ConfigProtocol(Protocol):
+    """
+    Protocol for OAuth2 configuration. Any config passed to `request_new` or `refresh`
+    should conform to this interface.
+    """
+    client: Optional[Client]
+    token_url: URL
+    client_id: str
+    client_secret: str
+    grant_type: OAuth2GrantType | str
+    scope: Optional[str]
+    token_class: type[OAuth2Token]
+
+
+class _TokenRequestHelper:
+    """
+    Internal helper class responsible for performing HTTP requests to the OAuth2 token endpoint.
+    """
+
+    @staticmethod
+    def _prepare_client(
+        existing_client: Optional[Client],
+        token_url: URL,
+        client_id: str,
+        client_secret: str,
+    ) -> tuple[Client, Optional[Auth]]:
+        """
+        Prepare an httpx.Client for a token request. If an existing client is provided, swap in BasicAuth
+        and return the original auth so it can be restored later. Otherwise, instantiate a new client.
+
+        Returns:
+            - client: Client to use for the request
+            - original_auth: The auth that was on the existing client (None if a new client was created)
+        """
+        if existing_client:
+            original_auth = existing_client.auth
+            existing_client.auth = BasicAuth(client_id, client_secret)
+            logger.debug("Swapped in BasicAuth on existing client for token request.")
+            return existing_client, original_auth
+        else:
+            logger.debug("Creating a new httpx.Client for token request.")
+            new_client = Client(
+                base_url=str(token_url),
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Accept": "application/json"
+                },
+                auth=BasicAuth(client_id, client_secret),
+                timeout=10.0  # example default timeout
+            )
+            return new_client, None
+
+    @staticmethod
+    def _finalize_client(
+        client: Client,
+        original_auth: Optional[Auth],
+        used_existing_client: bool
+    ) -> None:
+        """
+        Restore or close the client after the token request:
+        - If we used an existing client, restore its original auth.
+        - If we created a new client, close it.
+        """
+        if used_existing_client:
+            if original_auth is not None:
+                client.auth = original_auth
+                logger.debug("Restored original auth on existing client.")
+        else:
+            client.close()
+            logger.debug("Closed temporary httpx.Client after token request.")
+
+    @staticmethod
+    def perform_request(
+        token_url: URL,
+        client_id: str,
+        client_secret: str,
+        payload: Dict[str, Any],
+        existing_client: Optional[Client]
+    ) -> Dict[str, Any]:
+        """
+        Perform an HTTP POST to the token endpoint with BasicAuth. Handles exceptions and returns
+        the parsed JSON token data.
+
+        Raises:
+            OAuth2TokenInvalid on HTTP status errors or network issues.
+        """
+        client, original_auth = _TokenRequestHelper._prepare_client(
+            existing_client, token_url, client_id, client_secret
+        )
+        used_existing_client = existing_client is not None
+
+        try:
+            logger.debug(
+                "Sending token request to %s with payload: %s",
+                token_url, payload
+            )
+            response: Response = client.post(str(token_url), data=payload)
+            response.raise_for_status()
+            token_data = response.json()
+            logger.debug("Token endpoint response data: %s", token_data)
+            return token_data
+        except HTTPStatusError as http_err:
+            status = http_err.response.status_code
+            text = http_err.response.text
+            logger.error("Token endpoint HTTP error %s: %s", status, text)
+            raise OAuth2TokenInvalid(f"Token request failed ({status}): {text}") from http_err
+        except RequestError as req_err:
+            logger.error("Network error during token request: %s", str(req_err))
+            raise OAuth2TokenInvalid(f"Network error during token request: {req_err}") from req_err
+        finally:
+            _TokenRequestHelper._finalize_client(client, original_auth, used_existing_client)
+
+
 @dataclass(frozen=True)
 class OAuth2Token:
     """
-    Data class to hold OAuth2 token information. This class provides methods to check
-    the token's validity, expiration, and to refresh the token if necessary.
-    It also provides methods to convert the token to and from a dictionary format.
-    This class is immutable and should be instantiated with all required parameters.
-    The token is considered valid if it is not expired and has a non-null access token.
-    The token is considered expired if the current time is greater than the expiration
-    time minus the grace period. The token is considered revoked if the access token is
-    null.
-
-    Attributes:
-        access_token (str): The access token.
-        refresh_token (Optional[str]): The refresh token.
-        token_type (Optional[OAuthTokenType]): The type of the token (access or refresh).
-        expires_in (Optional[int]): The expiration time in seconds.
-        scope (Optional[List[str]]): The scope of the token.
-        grant_type (Optional[OAuth2GrantType]): The grant type used to obtain the token.
-        token_url (Optional[URL]): The URL to request the token.
-        client_id (Optional[str]): The client ID.
-        client_secret (Optional[str]): The client secret.
-        redirect_uri (Optional[URL]): The redirect URI.
-        created_at (Optional[datetime]): The time the token was created.
-        logger (Optional[logging.Logger]): Logger instance for logging.
-        grace_period (Optional[int]): The grace period for token expiration. The grace
-            period is the time before the token is considered expired. Defaults to
-            60 seconds. Use environmental variable AUTH_TOKEN_GRACE_PERIOD to set a
-            different value.
-
-    Methods:
-        expires_at: Returns the expiration time of the token.
-        is_expired: Checks if the token is expired.
-        is_valid: Checks if the token is valid.
-        is_revoked: Checks if the token is revoked.
-        token: Returns the access token.
-        refresh: Refreshes the token using the refresh_token grant.
-        request_new: Requests a new token using the provided OAuth2 configuration.
-        to_dict: Converts the OAuth2Token instance to a dictionary.
-        from_dict: Creates an OAuth2Token instance from a dictionary.
-
-    Raises:
-        OAuth2TokenExpired: If the token is expired.
-        OAuth2TokenInvalid: If the token is invalid or cannot be refreshed.
-        OAuth2TokenRevoked: If the token is revoked.
+    Immutable data class representing an OAuth2 token.
+    Provides methods to check expiration, validity, revocation, and to request/refresh tokens.
     """
-    access_token:   str
-    refresh_token:  Optional[str]       = None
-    token_type:     Optional[OAuthTokenType] = OAuthTokenType.ACCESS
-    expires_in:     Optional[int]       = 0
-    scope:          Optional[List[str]] = field(default_factory=list)
-    grant_type:     Optional[OAuth2GrantType] = None
-    token_url:      Optional[URL]       = None
-    client_id:      Optional[str]       = None
-    client_secret:  Optional[str]       = None
-    redirect_uri:   Optional[URL]       = None
-    created_at:     Optional[datetime]  = field(default_factory=datetime.now)
-    logger:         Optional[logging.Logger] = field(default_factory=logging.getLogger, repr=False)
-    grace_period:   Optional[int]       = TOKEN_GRACE_PERIOD
+
+    access_token: str
+    refresh_token: Optional[str] = None
+    token_type: Optional[OAuthTokenType] = OAuthTokenType.ACCESS
+    expires_in: Optional[int] = 0
+    scope: Optional[List[str]] = field(default_factory=list)
+    grant_type: Optional[OAuth2GrantType] = None
+    token_url: Optional[URL] = None
+    client_id: Optional[str] = None
+    client_secret: Optional[str] = None
+    redirect_uri: Optional[URL] = None
+    created_at: Optional[datetime] = field(
+        default_factory=lambda: datetime.now(tz=timezone.utc)
+    )
+    logger: logging.Logger = field(
+        default_factory=lambda: logger, repr=False
+    )
+    grace_period: Optional[int] = TOKEN_GRACE_PERIOD
+
+    def __post_init__(self) -> None:
+        """
+        Validate fields after initialization:
+        - access_token must not be empty.
+        - expires_in must be non-negative if provided.
+        - created_at must be timezone-aware (assume UTC if naive).
+        """
+        self.logger.debug(
+            "Initializing OAuth2Token(access_token=%s, expires_in=%s)",
+            self.access_token, self.expires_in
+        )
+
+        if not self.access_token:
+            self.logger.error("Empty access_token on OAuth2Token initialization.")
+            raise OAuth2TokenInvalid("Access token cannot be empty.")
+
+        if self.expires_in is not None and self.expires_in < 0:
+            self.logger.error("Negative expires_in (%s) on OAuth2Token initialization.", self.expires_in)
+            raise OAuth2TokenInvalid("expires_in must be non-negative.")
+
+        if self.created_at and self.created_at.tzinfo is None:
+            # Automatically assume UTC if naive
+            self.logger.warning("created_at is naive; assuming UTC timezone.")
+            object.__setattr__(self, "created_at", self.created_at.replace(tzinfo=timezone.utc))
 
     @property
     def expires_at(self) -> Optional[datetime]:
         """
-        Get the expiration time of the token.
-        :return: The expiration time as a datetime object.
+        Compute the absolute expiration datetime based on created_at + expires_in.
+        Returns None if expires_in is None.
         """
         if self.expires_in is None:
+            self.logger.debug("expires_in is None; expires_at is None.")
             return None
-        return self.created_at + timedelta(seconds=self.expires_in)
+
+        expiration = self.created_at + timedelta(seconds=self.expires_in)
+        self.logger.debug("Computed expires_at: %s", expiration)
+        return expiration
 
     @property
     def is_expired(self) -> bool:
         """
-        Check if the token is expired.
-        :return: True if the token is expired, False otherwise.
+        Determine if the token is expired or within its grace period.
+        If expires_at is None, treat as expired (cannot verify).
         """
-        expiration_time = self.expires_at
-        self.logger.debug("Checking token expiration. Expiration time: %s", expiration_time)
-        if expiration_time is None:
-            self.logger.debug("Token expiration time is None. Token is considered expired.")
+        exp = self.expires_at
+        if exp is None:
+            self.logger.debug("expires_at is None; treating token as expired.")
             return True
-        is_expired = datetime.now() > (expiration_time - timedelta(seconds=self.grace_period))
-        self.logger.debug("Token expired status: %s", is_expired)
-        return is_expired
+
+        # Subtract grace period
+        cutoff = exp - timedelta(seconds=self.grace_period or 0)
+        now = datetime.now(tz=timezone.utc)
+        expired = now > cutoff
+        self.logger.debug("Token expiration check: now=%s, cutoff=%s, expired=%s", now, cutoff, expired)
+        return expired
 
     @property
     def is_valid(self) -> bool:
         """
-        Check if the token is valid.
-        :return: True if the token is valid, False otherwise.
+        A token is valid if it has a non-empty access_token and is not expired.
         """
-        self.logger.debug("Checking token validity.")
-        if self.is_expired:
-            self.logger.debug("Token is expired. Invalid token.")
-            return False
         if not self.access_token:
-            self.logger.debug("Access token is None or empty. Invalid token.")
+            self.logger.debug("is_valid: access_token is empty -> invalid.")
             return False
-        self.logger.debug("Token is valid.")
+
+        if self.is_expired:
+            self.logger.debug("is_valid: token is expired -> invalid.")
+            return False
+
+        self.logger.debug("is_valid: token is valid.")
         return True
 
     @property
     def is_revoked(self) -> bool:
         """
-        Check if the token is revoked.
-        :return: True if the token is revoked, False otherwise.
+        A token is considered revoked if access_token is empty or None.
         """
-        self.logger.debug("Checking if token is revoked.")
-        is_revoked = not self.access_token
-        self.logger.debug("Token revoked status: %s", is_revoked)
-        return is_revoked
+        revoked = not bool(self.access_token)
+        self.logger.debug("is_revoked: %s", revoked)
+        return revoked
 
     @property
     def token(self) -> str:
         """
-        Get the token.
-        :return: The token.
+        Return the access_token if still valid and not revoked; otherwise raise.
         """
         if self.is_expired:
-            raise OAuth2TokenExpired("Token is expired.")
+            self.logger.error("Attempt to access expired token.")
+            raise OAuth2TokenExpired("Token has expired.")
         if self.is_revoked:
-            raise OAuth2TokenRevoked("Token is revoked.")
+            self.logger.error("Attempt to access revoked token.")
+            raise OAuth2TokenRevoked("Token has been revoked.")
         return self.access_token
 
-    def refresh(self, config: "OAuth2Config") -> "OAuth2Token":
+    def refresh(self, config: OAuth2ConfigProtocol) -> "OAuth2Token":
         """
-        Refresh this token using the refresh_token grant.
+        Refresh this token using the refresh_token grant. Returns a new OAuth2Token.
 
-        :param config: OAuth2Config containing:
-                       - client: httpx.Client
-                       - token_url: URL
-                       - client_id / client_secret
-                       - scope (optional)
-                       - token_class (class to instantiate)
-        :return: a fresh OAuth2Token
-        :raises OAuth2TokenExpired: if this token has already expired
-        :raises OAuth2TokenInvalid: if no refresh_token is present or HTTP fails
+        Raises:
+            - OAuth2TokenExpired: if the current token is already expired.
+            - OAuth2TokenInvalid: if refresh_token is missing or HTTP/network failure.
         """
-        # Must not try to refresh if the current token is already expired
         if self.is_expired:
-            self.logger.debug("Token is expired, cannot refresh.")
-            raise OAuth2TokenExpired("Cannot refresh: current token is expired.")
+            self.logger.error("Cannot refresh: token is already expired.")
+            raise OAuth2TokenExpired("Cannot refresh: token is expired.")
 
         if not self.refresh_token:
-            self.logger.debug("No refresh token available, cannot refresh.")
-            raise OAuth2TokenInvalid("Cannot refresh: no refresh_token available.")
+            self.logger.error("Cannot refresh: missing refresh_token.")
+            raise OAuth2TokenInvalid("Cannot refresh: no refresh_token provided.")
 
-        original_auth = None
-        if config.client is not None:
-            self.logger.debug("Using provided client for token refresh.")
-            original_auth: Auth = config.client.auth
-            self.logger.debug(f"Original auth: {original_auth}")
-            client = config.client
-            self.logger.debug(f"Using client: {client}")
-        else:
-            self.logger.warning("Client is not set in the configuration. Using new unsecured synchronous client.")
-            client = Client(
-                base_url=str(config.token_url),
-                headers={
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "Accept": "application/json"
-                }
-            )
-            self.logger.debug("Using new unsecured synchronous client for token refresh.")
+        self.logger.debug("Refreshing token via refresh_token grant.")
+        payload: Dict[str, Any] = {
+            "grant_type": "refresh_token",
+            "refresh_token": self.refresh_token,
+        }
+        if config.scope:
+            payload["scope"] = config.scope
 
-        client.auth = BasicAuth(config.client_id, config.client_secret)
-        self.logger.debug(f"Swapping in basic auth for refresh request: {client.auth}")
+        token_data = _TokenRequestHelper.perform_request(
+            token_url=self.token_url or config.token_url,
+            client_id=self.client_id or config.client_id,
+            client_secret=self.client_secret or config.client_secret,
+            payload=payload,
+            existing_client=config.client
+        )
 
-        try:
-            payload: Dict[str, Any] = {
-                "grant_type": "refresh_token",
-                "refresh_token": self.refresh_token,
-            }
-            if config.scope:
-                payload["scope"] = config.scope
-
-            response: Response = client.post(
-                str(config.token_url),
-                data=payload,
-            )
-
-            response.raise_for_status()
-            token_data: Dict[str, Any] = response.json()
-        except HTTPStatusError as e:
-            raise OAuth2TokenInvalid(
-                f"Failed to refresh token: {e.response.status_code} {e.response.text}"
-            ) from e
-        finally:
-            # Always restore the original auth
-            if original_auth is not None:
-                client.auth = original_auth
-
-        # Instantiate a new token object, preserving the token_class
-        return config.token_class.from_dict(token_data)
+        new_token = config.token_class.from_dict(token_data)
+        self.logger.debug("Received refreshed token: %s", new_token)
+        return new_token
 
     @classmethod
-    def request_new(cls, config: "OAuth2Config") -> 'OAuth2Token':
+    def request_new(cls, config: OAuth2ConfigProtocol) -> "OAuth2Token":
         """
-        Request a new token using the provided OAuth2 configuration.
-        :param config: The OAuth2 configuration to use for requesting a new token.
-        :return: A new OAuth2Token instance with the requested token.
+        Request a new token using the grant_type and client credentials provided in config.
+        Returns a new OAuth2Token.
+
+        Raises:
+            - OAuth2TokenInvalid: on HTTP/network failure.
         """
-        if config.client is None:
-            logger.warning("Client is not set in the configuration. Using new unsecured synchronous client.")
-            client = Client(
-                base_url=str(config.token_url),
-                headers={
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "Accept": "application/json"
-                }
-            )
-            logger.debug("Using new unsecured synchronous client for token request.")
-            cur_auth: Optional[Auth] = None
-            logger.debug("No current auth set, using BasicAuth for token request.")
-        else:
-            client = config.client
-            logger.debug(f"Using provided client: {client}")
-            cur_auth: Optional[Auth] = client.auth
-            logger.debug(f"Current auth: {cur_auth}")
-            client.auth = BasicAuth(config.client_id, config.client_secret)
-        logger.debug(f"Requesting new token with config: {config}")
+        request_logger = logging.getLogger(f"{cls.__name__}.request_new")
+        request_logger.debug("Requesting new token with grant_type=%s, scope=%s",
+                             config.grant_type, config.scope)
 
-        try:
-            logger.debug("Constructing request for new token.")
-            request: Request = Request(
-                method="POST",
-                url=str(config.token_url),
-                data={
-                    "grant_type": config.grant_type,
-                    "scope": config.scope
-                }
-            )
-            logger.debug(f"Request url: {request.url}")
-            logger.debug(f"Request headers: {request.headers}")
-            logger.debug(f"Request body: {request.content}")
+        payload: Dict[str, Any] = {
+            "grant_type": getattr(config, "grant_type", str(OAuth2GrantType.CLIENT_CREDENTIALS)),
+        }
+        if config.scope:
+            payload["scope"] = config.scope
 
-            response: Response = client.send(request)
-            logger.debug(f"Received response: {response}")
-            response.raise_for_status()
-            logger.debug(f"Response status code: {response.status_code}")
-            token_data: Dict[str, Any] = response.json()
-            logger.debug(f"Parsed token data: {token_data}")
-        except HTTPStatusError as e:
-            logger.error(f"HTTPStatusError encountered: {e}")
-            logger.error(f"Response status code: {e.response.status_code}")
-            logger.error(f"Response body: {e.response.text}")
-            logger.error(f"Request url: {e.request.url}")
-            logger.error(f"Request headers: {e.request.headers}")
-            logger.error(f"Request body: {e.request.content}")
+        token_data = _TokenRequestHelper.perform_request(
+            token_url=config.token_url,
+            client_id=config.client_id,
+            client_secret=config.client_secret,
+            payload=payload,
+            existing_client=config.client
+        )
 
-            raise OAuth2TokenInvalid(f"Failed to request new token: {e.response.status_code} {e.response.text}") from e
-        finally:
-            # Always restore the original auth
-            logger.debug("Restoring original auth after token request.")
-            if cur_auth is not None:
-                client.auth = cur_auth
-
-        return config.token_class.from_dict(token_data)
+        new_token = config.token_class.from_dict(token_data)
+        request_logger.debug("Received new token: %s", new_token)
+        return new_token
 
     def to_dict(self) -> Dict[str, Any]:
         """
-        Convert the OAuth2Token instance to a dictionary.
-        :return: A dictionary representation of the OAuth2Token instance.
+        Serialize the OAuth2Token to a dictionary for storage or JSON serialization.
         """
         return {
             "access_token": self.access_token,
@@ -295,82 +334,164 @@ class OAuth2Token:
             "token_type": self.token_type.value if self.token_type else None,
             "expires_in": self.expires_in,
             "scope": self.scope,
+            "grant_type": self.grant_type.value if self.grant_type else None,
             "token_url": str(self.token_url) if self.token_url else None,
             "client_id": self.client_id,
             "client_secret": self.client_secret,
-            "redirect_uri": str(self.redirect_uri) if self.redirect_uri else None
+            "redirect_uri": str(self.redirect_uri) if self.redirect_uri else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'OAuth2Token':
+    def from_dict(cls, data: Dict[str, Any]) -> "OAuth2Token":
         """
-        Create an OAuth2Token instance from a dictionary.
-        :param data: The dictionary containing token information.
-        :return: An OAuth2Token instance.
+        Reconstruct an OAuth2Token from a serialized dictionary.
+        Parses token_type, grant_type, created_at, token_url, and redirect_uri as needed.
         """
-        logging.getLogger(cls.__name__).warning(
-            "Client is not set in the configuration. Using new unsecured synchronous client.")
+        # Parse token_type
+        raw_type = data.get("token_type")
+        token_type = None
+        if isinstance(raw_type, str):
+            try:
+                token_type = OAuthTokenType(raw_type)
+            except ValueError:
+                token_type = OAuthTokenType.ACCESS
+
+        # Parse grant_type
+        raw_grant = data.get("grant_type")
+        grant_type = None
+        if isinstance(raw_grant, str):
+            try:
+                grant_type = OAuth2GrantType(raw_grant)
+            except ValueError:
+                grant_type = None
+
+        # Parse created_at
+        created_at_raw = data.get("created_at")
+        if created_at_raw:
+            try:
+                created_at = datetime.fromisoformat(created_at_raw)
+                if created_at.tzinfo is None:
+                    created_at = created_at.replace(tzinfo=timezone.utc)
+            except (ValueError, TypeError):
+                created_at = datetime.now(tz=timezone.utc)
+        else:
+            created_at = datetime.now(tz=timezone.utc)
+
+        # Parse URLs
+        raw_url = data.get("token_url")
+        token_url = URL(raw_url) if raw_url else None
+
+        raw_redirect = data.get("redirect_uri")
+        redirect_uri = URL(raw_redirect) if raw_redirect else None
 
         return cls(
-            access_token=data.get("access_token"),
+            access_token=data.get("access_token", ""),
             refresh_token=data.get("refresh_token"),
-            token_type=data.get("token_type"),
+            token_type=token_type,
             expires_in=data.get("expires_in"),
-            scope=data.get("scope"),
-            token_url=data.get("token_url"),
+            scope=data.get("scope") or [],
+            grant_type=grant_type,
+            token_url=token_url,
             client_id=data.get("client_id"),
             client_secret=data.get("client_secret"),
-            redirect_uri=data.get("redirect_uri")
+            redirect_uri=redirect_uri,
+            created_at=created_at,
         )
 
-    def __repr__(self):
-        return f"OAuth2Token(access_token={self.access_token}, refresh_token={self.refresh_token}, token_type={self.token_type}, expires_at={self.expires_at}, scope={self.scope})"
+    def __repr__(self) -> str:
+        """
+        Custom representation showing key fields.
+        """
+        exp = self.expires_at.isoformat() if self.expires_at else "None"
+        return (
+            f"{self.__class__.__name__}("
+            f"access_token={self.access_token!r}, "
+            f"refresh_token={self.refresh_token!r}, "
+            f"token_type={self.token_type!r}, "
+            f"expires_at={exp!r}, "
+            f"scope={self.scope!r})"
+        )
+
 
 class RiskAnalyticsToken(OAuth2Token):
+    """
+    Specialized token class for Risk Analytics. Implements a JSON-based token request
+    that does not use client credentials in form data but in JSON with NoAuth.
+    """
+
     @classmethod
-    def request_new(cls, config: "OAuth2Config") -> 'OAuth2Token':
+    def request_new(cls, config: OAuth2ConfigProtocol) -> "RiskAnalyticsToken":
         """
-        Request a new token using the provided OAuth2 configuration.
-        :param config: The OAuth2 configuration to use for requesting a new token.
-        :return: A new OAuth2Token instance with the requested token.
+        Request a new RiskAnalyticsToken using JSON payload and NoAuth HTTP client.
+
+        Raises:
+            - OAuth2TokenInvalid: on HTTP/network failure or missing client.
         """
-        logger = logging.getLogger(cls.__name__)
-        logger.debug("Starting request_new method with config: %s", config)
+        ra_logger = logging.getLogger(f"{cls.__name__}.request_new")
+        ra_logger.debug("Requesting new RiskAnalyticsToken with JSON payload.")
+
+        if not config.client:
+            ra_logger.error("Config.client is required for RiskAnalyticsToken.request_new.")
+            raise OAuth2TokenInvalid("HTTP client is required for RiskAnalyticsToken.")
+
+        json_payload: Dict[str, Any] = {
+            "client_id": config.client_id,
+            "client_secret": config.client_secret,
+        }
+
+        request = Request(
+            method="POST",
+            url=str(config.token_url),
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            json=json_payload
+        )
 
         try:
-            request: Request = Request(
-                method="POST",
-                url=str(config.token_url),
-                headers={
-                    "Content-Type": "application/json",
-                    "Accept": "application/json"
-                },
-                json={
-                    "client_id": config.client_id,
-                    "client_secret": config.client_secret,
-                }
-            )
-            logger.debug("Constructed request object: %s", request)
-            logger.debug("Request headers: %s", request.headers)
-            logger.debug("Request body: %s", request.content)
-
             response: Response = config.client.send(request, auth=NoAuth())
-            logger.debug("Received response: %s", response)
-            logger.debug("Response status code: %s", response.status_code)
-            logger.debug("Response headers: %s", response.headers)
-            logger.debug("Response body: %s", response.text)
-
             response.raise_for_status()
-            token_data: Dict[str, Any] = response.json()
-            logger.debug("Parsed token data from response: %s", token_data)
-        except HTTPStatusError as e:
-            logger.error("HTTPStatusError encountered: %s", e)
-            logger.error("Response status code: %s", e.response.status_code)
-            logger.error("Response body: %s", e.response.text)
-            raise OAuth2TokenInvalid(f"Failed to request new token: {e.response.status_code} {e.response.text}") from e
-        except Exception as e:
-            logger.error("Unexpected error during token request: %s", e)
-            raise
+            token_data = response.json()
+            ra_logger.debug("Received RiskAnalyticsToken data: %s", token_data)
+        except HTTPStatusError as http_err:
+            status = http_err.response.status_code
+            text = http_err.response.text
+            ra_logger.error("RiskAnalyticsToken HTTP error %s: %s", status, text)
+            raise OAuth2TokenInvalid(f"RiskAnalyticsToken request failed ({status}): {text}") from http_err
+        except RequestError as req_err:
+            ra_logger.error("Network error during RiskAnalyticsToken request: %s", str(req_err))
+            raise OAuth2TokenInvalid(f"Network error during RiskAnalyticsToken request: {req_err}") from req_err
 
-        logger.debug("Successfully created new token instance from token data.")
         return config.token_class.from_dict(token_data)
+
+
+# ============================================================================
+# Example usage (separate file or test module):
+# ============================================================================
+
+# from httpx import Client, URL
+# from mypackage.oauth2 import OAuth2Config, OAuth2Token, OAuth2GrantType, OAuth2TokenInvalid
+#
+# # 1. Request a new token with client credentials:
+# config = OAuth2Config(
+#     client=Client(),
+#     token_url=URL("https://example.com/oauth2/token"),
+#     client_id="your-client-id",
+#     client_secret="your-client-secret",
+#     grant_type=OAuth2GrantType.CLIENT_CREDENTIALS,
+#     scope="read write",
+#     token_class=OAuth2Token
+# )
+#
+# try:
+#     token = OAuth2Token.request_new(config)
+#     print("Access Token:", token.access_token)
+#     print("Expires At:", token.expires_at)
+# except OAuth2TokenInvalid as e:
+#     print(f"Failed to obtain token: {e}")
+#
+# # 2. Later, refresh the token:
+# try:
+#     refreshed = token.refresh(config)
+#     print("Refreshed Access Token:", refreshed.access_token)
+# except (OAuth2TokenExpired, OAuth2TokenInvalid) as e:
+#     print(f"Failed to refresh token: {e}")
