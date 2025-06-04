@@ -310,6 +310,9 @@ class RiskAnalyticsToken(OAuth2Token):
         :param config: The OAuth2 configuration to use for requesting a new token.
         :return: A new OAuth2Token instance with the requested token.
         """
+        logger = logging.getLogger(cls.__name__)
+        logger.debug("Starting request_new method with config: %s", config)
+
         try:
             request: Request = Request(
                 method="POST",
@@ -323,13 +326,27 @@ class RiskAnalyticsToken(OAuth2Token):
                     "client_secret": config.client_secret,
                 }
             )
-            logging.getLogger(cls.__name__).debug(f"Request headers: {request.headers}")
-            logging.getLogger(cls.__name__).debug(f"Request body: {request.content}")
+            logger.debug("Constructed request object: %s", request)
+            logger.debug("Request headers: %s", request.headers)
+            logger.debug("Request body: %s", request.content)
 
             response: Response = config.client.send(request, auth=NoAuth())
+            logger.debug("Received response: %s", response)
+            logger.debug("Response status code: %s", response.status_code)
+            logger.debug("Response headers: %s", response.headers)
+            logger.debug("Response body: %s", response.text)
+
             response.raise_for_status()
             token_data: Dict[str, Any] = response.json()
+            logger.debug("Parsed token data from response: %s", token_data)
         except HTTPStatusError as e:
+            logger.error("HTTPStatusError encountered: %s", e)
+            logger.error("Response status code: %s", e.response.status_code)
+            logger.error("Response body: %s", e.response.text)
             raise OAuth2TokenInvalid(f"Failed to request new token: {e.response.status_code} {e.response.text}") from e
+        except Exception as e:
+            logger.error("Unexpected error during token request: %s", e)
+            raise
 
+        logger.debug("Successfully created new token instance from token data.")
         return config.token_class.from_dict(token_data)
