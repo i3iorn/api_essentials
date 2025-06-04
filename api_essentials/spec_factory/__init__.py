@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Union, Dict, Any, Optional
+from typing import Union, Dict, Any, Optional, List
 from pathlib import Path
 
 from api_essentials.client import APIClient
@@ -84,7 +84,7 @@ def _create_client_from_swagger_v2(spec: dict, client_kwargs: Dict[str, Any], oa
     oauth_config = _extract_oauth_config(spec.get("securityDefinitions", {}), **oauth_kwargs)
     return APIClient(config=oauth_config, base_url=base_url, **client_kwargs)
 
-def _extract_oauth_config(security_schemes: dict, client_id: str, client_secret: str, **kwargs) -> OAuth2Config:
+def _extract_oauth_config(security_schemes: dict, client_id: str, client_secret: str, scopes: List[str] = None, **kwargs) -> OAuth2Config:
     """
     Extract OAuth2 configuration from security schemes.
 
@@ -101,15 +101,15 @@ def _extract_oauth_config(security_schemes: dict, client_id: str, client_secret:
         if scheme.get("type", DEFAULT_AUTH_SCHEMA_TYPE) == "oauth2":
             logger.debug("Found OAuth2 security scheme: %s", scheme_name)
             token_url = kwargs.get("tokenUrl", scheme.get("tokenUrl"))
-            scopes = list(scheme.get("flows", {}).get("clientCredentials", {}).get("scopes", {}).keys())
-            if len(scopes) == 0:
-                scopes = DEFAULT_SCOPES
+            spec_scopes = list(scheme.get("flows", {}).get("clientCredentials", {}).get("scopes", {}).keys())
+            if len(spec_scopes) == 0:
+                spec_scopes = DEFAULT_SCOPES
 
             return OAuth2Config(
                 client_id=client_id,
                 client_secret=client_secret,
                 token_url=token_url,
-                scope=scopes
+                scope=scopes or spec_scopes
             )
 
     logger.warning(f"No OAuth2 security scheme found in the specification. "
@@ -117,6 +117,7 @@ def _extract_oauth_config(security_schemes: dict, client_id: str, client_secret:
     return OAuth2Config(
         client_id=client_id,
         client_secret=client_secret,
-        token_url=kwargs.get("tokenUrl"),
-        scope=DEFAULT_SCOPES
+        token_url=kwargs["tokenUrl"],
+        scope=scopes or DEFAULT_SCOPES,
+        **kwargs
     )
