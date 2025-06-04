@@ -35,6 +35,7 @@ class BaseOAuth2(BaseAuth):
 
         self.config: "OAuth2Config" = config
         self.logger: logging.Logger = logging.getLogger(__name__)
+        self.logger.debug("BaseOAuth2 initialized with config: %s", config)
 
     def sync_auth_flow(
         self, request: Request
@@ -48,9 +49,9 @@ class BaseOAuth2(BaseAuth):
         Raises:
             RuntimeError: If the token acquisition fails.
         """
-        self.logger.debug("Starting OAuth2 async auth flow.")
+        self.logger.debug("Starting OAuth2 sync auth flow with request: %s", request)
         request = self._setup_auth_flow(request)
-
+        self.logger.debug("Yielding request in sync auth flow: %s", request)
         yield request
 
     async def async_auth_flow(
@@ -66,9 +67,9 @@ class BaseOAuth2(BaseAuth):
         Raises:
             RuntimeError: If the token acquisition fails.
         """
-        self.logger.debug("Starting OAuth2 async auth flow.")
+        self.logger.debug("Starting OAuth2 async auth flow with request: %s", request)
         request = self._setup_auth_flow(request)
-
+        self.logger.debug("Yielding request in async auth flow: %s", request)
         yield request
 
     def _setup_auth_flow(self, request: httpx.Request) -> httpx.Request:
@@ -82,17 +83,19 @@ class BaseOAuth2(BaseAuth):
         Raises:
             RuntimeError: If the token acquisition fails.
         """
-        self.logger.debug("Setting up OAuth2 auth flow.")
+        self.logger.debug("Setting up OAuth2 auth flow for request: %s", request)
         try:
             token: OAuth2Token = self._get_token()
+            self.logger.debug("Obtained token: %s", token)
         except AttributeError:
-            # propagate attribute errors (e.g., async client misuse)
+            self.logger.error("AttributeError encountered during token acquisition.")
             raise
         except Exception as e:
             self.logger.error("Failed to get OAuth2 token: %s", str(e))
             raise RuntimeError("Failed to get OAuth2 token.") from e
         request.headers["Authorization"] = f"Bearer {token.access_token}"
         request.headers["Content-Type"] = "application/json"
+        self.logger.debug("Request headers updated for OAuth2 auth flow: %s", request.headers)
         return request
 
     def _get_token(self) -> "OAuth2Token":
@@ -130,3 +133,4 @@ class BaseOAuth2(BaseAuth):
         else:
             self.logger.error("No token class provided.")
             raise RuntimeError("No token class provided.")
+

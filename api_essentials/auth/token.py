@@ -99,9 +99,14 @@ class OAuth2Token:
         Check if the token is expired.
         :return: True if the token is expired, False otherwise.
         """
-        if self.expires_in is None:
+        expiration_time = self.expires_at
+        self.logger.debug("Checking token expiration. Expiration time: %s", expiration_time)
+        if expiration_time is None:
+            self.logger.debug("Token expiration time is None. Token is considered expired.")
             return True
-        return datetime.now() > (self.created_at + timedelta(seconds=self.expires_in) - timedelta(seconds=self.grace_period))
+        is_expired = datetime.now() > (expiration_time - timedelta(seconds=self.grace_period))
+        self.logger.debug("Token expired status: %s", is_expired)
+        return is_expired
 
     @property
     def is_valid(self) -> bool:
@@ -109,7 +114,15 @@ class OAuth2Token:
         Check if the token is valid.
         :return: True if the token is valid, False otherwise.
         """
-        return not self.is_expired and self.access_token is not None
+        self.logger.debug("Checking token validity.")
+        if self.is_expired:
+            self.logger.debug("Token is expired. Invalid token.")
+            return False
+        if not self.access_token:
+            self.logger.debug("Access token is None or empty. Invalid token.")
+            return False
+        self.logger.debug("Token is valid.")
+        return True
 
     @property
     def is_revoked(self) -> bool:
@@ -117,7 +130,10 @@ class OAuth2Token:
         Check if the token is revoked.
         :return: True if the token is revoked, False otherwise.
         """
-        return self.access_token is None
+        self.logger.debug("Checking if token is revoked.")
+        is_revoked = not self.access_token
+        self.logger.debug("Token revoked status: %s", is_revoked)
+        return is_revoked
 
     @property
     def token(self) -> str:
