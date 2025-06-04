@@ -117,7 +117,7 @@ def _extract_oauth_config(security_schemes: dict, client_id: str, client_secret:
     return OAuth2Config(
         client_id=client_id,
         client_secret=client_secret,
-        token_url=kwargs["tokenUrl"],
+        token_url=kwargs.pop("tokenUrl"),
         scope=scopes or DEFAULT_SCOPES,
         **kwargs
     )
