@@ -269,6 +269,12 @@ class OAuth2Token:
             logger.debug(f"Parsed token data: {token_data}")
         except HTTPStatusError as e:
             logger.error(f"HTTPStatusError encountered: {e}")
+            logger.error(f"Response status code: {e.response.status_code}")
+            logger.error(f"Response body: {e.response.text}")
+            logger.error(f"Request url: {e.request.url}")
+            logger.error(f"Request headers: {e.request.headers}")
+            logger.error(f"Request body: {e.request.content}")
+
             raise OAuth2TokenInvalid(f"Failed to request new token: {e.response.status_code} {e.response.text}") from e
         finally:
             # Always restore the original auth
